@@ -1,5 +1,6 @@
 // app/routes/api/graphql.ts
-import { ApolloServer, gql } from "apollo-server-micro";
+import { ApolloServer } from '@apollo/server';
+import {gql} from "graphql-tag"
 import { prisma } from "~/utils/prisma.server";
 import { v4 as uuidv4 } from "uuid";
 import { rateLimiter } from "~/utils/redis.server";
@@ -229,9 +230,10 @@ const resolvers = {
 
 const apolloServer = new ApolloServer({
   typeDefs,
-  context: async ({ request }: { request: Request }) => {
-    const userId = request.headers.get("x-user-id") || null;
-    const ip = request.headers.get("x-forwarded-for") || "";
+  resolvers,
+  context: async ({ req }: { req: Request }) => {
+    const userId = req.headers.get("x-user-id") || null;
+    const ip = req.headers.get("x-forwarded-for") || "";
     return { userId, ip };
   },
 });
