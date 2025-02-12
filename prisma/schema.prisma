@@ -1,0 +1,30 @@
+// prisma/schema.prisma
+datasource db {
+  provider  = "mongodb"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  kindeId   String    @unique
+  email     String    @unique
+  name      String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  chatbots  Chatbot[]
+}
+
+model Chatbot {
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  name             String
+  connectionString String    @unique
+  ownerId          String    @db.ObjectId
+  owner            User      @relation(fields: [ownerId], references: [id])
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
