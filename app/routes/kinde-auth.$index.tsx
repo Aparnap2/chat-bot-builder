@@ -1,7 +1,7 @@
 // app/routes/kinde-auth.$index.tsx
 import { handleAuth } from "@kinde-oss/kinde-remix-sdk";
 import type { LoaderFunctionArgs } from "@remix-run/node";
-import { prisma } from "../utils/prisma.server";
+import { prisma } from "~/utils/prisma.server";
 
 async function upsertUser(user: any) {
   if (!user || !user.id) {

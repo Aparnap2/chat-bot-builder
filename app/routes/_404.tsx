@@ -45,6 +45,3 @@ const NotFound = () => {
 
 export default NotFound;
 
-export function meta() {
-  return [{ title: "404: Page Not Found" }];
-}

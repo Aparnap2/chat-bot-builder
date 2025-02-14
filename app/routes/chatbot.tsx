@@ -14,11 +14,12 @@ const CustomizationPanel = () => {
   const [customPrompt, setCustomPrompt] = useState("");
   const [staticResponses, setStaticResponses] = useState([{ trigger: "", response: "" }]);
   const [files, setFiles] = useState<File[]>([]);
-  const [togglerIcon, setTogglerIcon] = useState("MessageCircle");
   const [togglerSize, setTogglerSize] = useState("56");
   const [previewMessage, setPreviewMessage] = useState("");
-  const [previewChat, setPreviewChat] = useState<Array<{ role: 'user' | 'bot', content: string }>>([]);
+  const [previewChat, setPreviewChat] = useState<Array<{ role: "user" | "bot"; content: string }>>([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
+
+  // Helper functions
   const addStaticResponse = () => {
     setStaticResponses([...staticResponses, { trigger: "", response: "" }]);
   };
@@ -40,11 +41,14 @@ const CustomizationPanel = () => {
 
   const handlePreviewSend = () => {
     if (!previewMessage.trim()) return;
-
     setPreviewChat([
       ...previewChat,
-      { role: 'user', content: previewMessage },
-      { role: 'bot', content: "This is a preview response. Your actual bot will use your configured responses and AI model." }
+      { role: "user", content: previewMessage },
+      {
+        role: "bot",
+        content:
+          "This is a preview response. Your actual bot will use your configured responses and AI model.",
+      },
     ]);
     setPreviewMessage("");
   };
@@ -52,38 +56,31 @@ const CustomizationPanel = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800">
       <Navbar />
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="glass-card p-
-4 sm:p-
-8 rounded-2xl">
-            <h1 className="text-
-2xl sm:text-
-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary mb-8">    Customize Your Chatbot
+          {/* Customization Panel */}
+          <div className="glass-card p-4 sm:p-8 rounded-2xl">
+            <h1 className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary mb-8">
+              Customize Your Chatbot
             </h1>
 
-            {/* Custom Tabs */}
-            <div className="flex flex-wrap gap-2 p-1 mb-6 bg-gray-800/50 rounded-lg
- overflow-x-auto
-">
+            {/* Tab Navigation */}
+            <div className="flex flex-wrap gap-2 p-2 mb-6 bg-gray-800/50 rounded-lg overflow-x-auto">
               {[
                 { id: "branding", icon: <Palette className="w-4 h-4" />, label: "Branding" },
                 { id: "responses", icon: <MessageSquare className="w-4 h-4" />, label: "Static Responses" },
                 { id: "prompts", icon: <Code className="w-4 h-4" />, label: "Prompt Engineering" },
-                { id: "docs", icon: <FileText className="w-4 h-4" />, label: "Documentation" }
+                { id: "docs", icon: <FileText className="w-4 h-4" />, label: "Documentation" },
               ].map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-
-                    3
-                     py-2 rounded-lg transition-colors 
-                    whitespace-nowrap text-sm sm:text-base 
-                     ${activeTab === tab.id
-                    ? "bg-gray-900 text-white"
-                    : "text-gray-400 hover:text-white hover:bg-gray-900/50"
-                    }`}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors whitespace-nowrap text-sm sm:text-base ${
+                    activeTab === tab.id
+                      ? "bg-gray-900 text-white"
+                      : "text-gray-400 hover:text-white hover:bg-gray-900/50"
+                  }`}
+                  aria-label={`Switch to ${tab.label} tab`}
                 >
                   {tab.icon}
                   {tab.label}
@@ -106,7 +103,6 @@ const CustomizationPanel = () => {
                       className="w-full px-4 py-2 bg-black/30 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/50"
                     />
                   </div>
-
                   <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-200">Brand Color</label>
                     <div className="flex gap-4">
@@ -126,7 +122,9 @@ const CustomizationPanel = () => {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-200">Toggler Icon Size (px)</label>
+                    <label className="block text-sm font-medium text-gray-200">
+                      Toggler Icon Size (px)
+                    </label>
                     <input
                       type="number"
                       value={togglerSize}
@@ -180,6 +178,7 @@ const CustomizationPanel = () => {
                           <button
                             onClick={() => removeStaticResponse(index)}
                             className="text-red-500 hover:text-red-400 p-2"
+                            aria-label="Remove static response"
                           >
                             <Trash2 className="w-5 h-5" />
                           </button>
@@ -188,7 +187,8 @@ const CustomizationPanel = () => {
                     ))}
                     <button
                       onClick={addStaticResponse}
-                      className="flex items-center gap-2 text-primary hover:text-primary-hover"
+                      className="flex items-center gap-2 text-primary hover:text-primary-hover focus:outline-none"
+                      aria-label="Add static response"
                     >
                       <Plus className="w-4 h-4" /> Add Response
                     </button>
@@ -208,7 +208,6 @@ const CustomizationPanel = () => {
                       className="w-full h-48 px-4 py-2 bg-black/30 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
                     />
                   </div>
-
                   <div className="glass-card p-6 rounded-xl space-y-4">
                     <h3 className="text-lg font-medium text-white">Prompt Engineering Tips</h3>
                     <ul className="list-disc list-inside space-y-2 text-gray-400">
@@ -228,14 +227,13 @@ const CustomizationPanel = () => {
                   <div
                     onClick={() => document.getElementById("fileInput")?.click()}
                     className="glass-card p-8 rounded-xl border-2 border-dashed border-white/10 text-center cursor-pointer hover:border-white/20 transition-colors"
+                    aria-label="Upload Documentation"
                   >
                     <Upload className="w-12 h-12 mx-auto text-gray-400 mb-4" />
                     <p className="text-gray-300 mb-2">
                       Drop your documentation files here or click to browse
                     </p>
-                    <p className="text-sm text-gray-500">
-                      Supports PDF, DOCX, TXT, MD (max 10MB)
-                    </p>
+                    <p className="text-sm text-gray-500">Supports PDF, DOCX, TXT, MD (max 10MB)</p>
                     <input
                       id="fileInput"
                       type="file"
@@ -255,13 +253,12 @@ const CustomizationPanel = () => {
                             <div className="flex items-center gap-2">
                               <FileText className="w-4 h-4 text-gray-400" />
                               <span className="text-gray-300">{file.name}</span>
-                              <span className="text-gray-500 text-sm">
-                                ({Math.round(file.size / 1024)}KB)
-                              </span>
+                              <span className="text-gray-500 text-sm">({Math.round(file.size / 1024)}KB)</span>
                             </div>
                             <button
                               onClick={() => removeFile(index)}
                               className="text-red-500 hover:text-red-400"
+                              aria-label="Remove file"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -275,52 +272,52 @@ const CustomizationPanel = () => {
             </div>
 
             <div className="mt-8 flex justify-end">
-            <button
- className="neo-brutalism px-6 py-2 bg-primary text-white rounded-xl hover:bg-primary-hover">
+              <button className="neo-brutalism px-6 py-2 bg-primary text-white rounded-xl hover:bg-primary-hover focus:outline-none">
                 Save Changes
               </button>
             </div>
           </div>
 
-            {/* Live Preview - Now shows as a floating chat window */}
-            <div className="hidden lg:block glass-card p-8 rounded-2xl h-[800px]">
+          {/* Desktop Preview */}
+          {/* <div className="hidden lg:block glass-card p-8 rounded-2xl h-[600px]">
             <h2 className="text-xl font-semibold text-white mb-4">Desktop Preview</h2>
             <div className="relative w-full h-full bg-gray-900/50 rounded-xl p-4">
-              {/* Preview of the toggle button */}
-              <div 
+              <div
                 className="absolute bottom-4 right-4 cursor-pointer transform transition-transform hover:scale-105"
                 style={{ backgroundColor: brandColor }}
               >
                 <MessageCircle size={Number(togglerSize)} className="text-white p-3" />
               </div>
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
 
       {/* Floating Chat Preview (Mobile & Desktop) */}
-      <div className={`fixed ${isChatOpen ? 'inset-0 lg:inset-auto lg:bottom-4 lg:right-4' : 'bottom-4 right-4'} z-50 transition-all duration-300`}>
+      <div
+        className={`fixed ${
+          isChatOpen ? "inset-0 lg:inset-auto lg:bottom-4 lg:right-4" : "bottom-4 right-4"
+        } z-50 transition-all duration-300`}
+      >
         {isChatOpen ? (
-          <div className={`
-            glass-card 
-            ${isChatOpen ? 'w-full h-full lg:w-96 lg:h-[600px]' : 'w-auto h-auto'} 
-            flex flex-col
-            rounded-none lg:rounded-2xl
-            overflow-hidden
-          `}>
+          <div
+            className={`glass-card flex flex-col overflow-hidden ${
+              isChatOpen ? "w-full h-full lg:w-96 lg:h-[600px]" : "w-auto h-auto"
+            }`}
+          >
             <div className="flex items-center justify-between p-4 border-b border-white/10">
               <div className="flex items-center gap-3">
                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: brandColor }} />
                 <h2 className="text-xl font-semibold text-white">{botName}</h2>
               </div>
-              <button 
+              <button
                 onClick={() => setIsChatOpen(false)}
-                className="text-gray-400 hover:text-white"
+                className="text-gray-400 hover:text-white focus:outline-none"
+                aria-label="Close Chat"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
-
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               <div className="flex gap-3 items-start">
                 <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white">
@@ -330,20 +327,26 @@ const CustomizationPanel = () => {
                   <p className="text-white">{welcomeMessage}</p>
                 </div>
               </div>
-
               {previewChat.map((message, index) => (
-                <div key={index} className={`flex gap-3 items-start ${message.role === 'user' ? 'justify-end' : ''}`}>
-                  {message.role === 'bot' && (
+                <div
+                  key={index}
+                  className={`flex gap-3 items-start ${
+                    message.role === "user" ? "justify-end" : ""
+                  }`}
+                >
+                  {message.role === "bot" && (
                     <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white">
                       AI
                     </div>
                   )}
-                  <div className={`glass-card p-3 rounded-xl max-w-[80%] ${
-                    message.role === 'user' ? 'bg-primary text-white' : ''
-                  }`}>
+                  <div
+                    className={`glass-card p-3 rounded-xl max-w-[80%] ${
+                      message.role === "user" ? "bg-primary text-white" : ""
+                    }`}
+                  >
                     <p className="text-white">{message.content}</p>
                   </div>
-                  {message.role === 'user' && (
+                  {message.role === "user" && (
                     <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-white">
                       You
                     </div>
@@ -351,21 +354,21 @@ const CustomizationPanel = () => {
                 </div>
               ))}
             </div>
-
             <div className="p-4 border-t border-white/10">
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={previewMessage}
                   onChange={(e) => setPreviewMessage(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handlePreviewSend()}
+                  onKeyPress={(e) => e.key === "Enter" && handlePreviewSend()}
                   placeholder="Type a message..."
                   className="flex-1 px-4 py-2 bg-black/30 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/50"
                 />
                 <button
                   onClick={handlePreviewSend}
-                  className="p-2 rounded-lg"
+                  className="p-2 rounded-lg focus:outline-none"
                   style={{ backgroundColor: brandColor }}
+                  aria-label="Send Message"
                 >
                   <Send className="w-5 h-5 text-white" />
                 </button>
@@ -375,12 +378,13 @@ const CustomizationPanel = () => {
         ) : (
           <button
             onClick={() => setIsChatOpen(true)}
-            className="rounded-full shadow-lg transform transition-transform hover:scale-105 flex items-center justify-center"
-            style={{ 
+            className="rounded-full shadow-lg transform transition-transform hover:scale-105 flex items-center justify-center focus:outline-none"
+            style={{
               backgroundColor: brandColor,
               width: `${togglerSize}px`,
-              height: `${togglerSize}px`
+              height: `${togglerSize}px`,
             }}
+            aria-label="Open Chat"
           >
             <MessageCircle className="w-6 h-6 text-white" />
           </button>
@@ -391,3 +395,4 @@ const CustomizationPanel = () => {
 };
 
 export default CustomizationPanel;
+
