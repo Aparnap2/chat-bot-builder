@@ -1,5 +1,5 @@
 import { redirect, LoaderFunctionArgs, ActionFunction, json } from "@remix-run/node";
-import { prisma } from "~/utils/prisma.server";
+import prisma from "~/utils/prisma.server";
 import { rateLimiter } from "~/utils/redis.server";
 import { v4 as uuidv4 } from "uuid";
 

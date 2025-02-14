@@ -1,7 +1,7 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json, redirect } from "@remix-run/node";
 import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
-import { prisma } from "~/utils/prisma.server";
+import  prisma  from "~/utils/prisma.server";
 import { useLoaderData, Link } from "@remix-run/react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

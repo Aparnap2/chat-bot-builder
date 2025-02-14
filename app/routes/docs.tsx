@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { dark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+//import { dark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 const DocumentationPage = () => {
   const docsMarkdown = `
@@ -121,7 +121,7 @@ For further information or support, please visit our [Support Page](https://your
       const match = /language-(\w+)/.exec(className || '');
       return !inline && match ? (
         <SyntaxHighlighter
-          style={dark}
+          //style={dark}
           language={match[1]}
           PreTag="div"
           {...props}
