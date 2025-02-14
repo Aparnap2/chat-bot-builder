@@ -1,8 +1,15 @@
 import { useState } from "react";
-import { Link } from "@remix-run/react";
+import { json, Link } from "@remix-run/react";
 import { toast } from "react-hot-toast";
 import { ArrowRight } from "lucide-react";
-
+import { LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
+// login.tsx & register.tsx
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const { isAuthenticated } = await getKindeSession(request);
+  if (await isAuthenticated()) throw redirect("/profile");
+  return json({});
+};
 function login({ authUrlParams }: { authUrlParams: { connection_id: string } }) {
   // Construct the URL with the given connection_id
   const url = `/kinde-auth/register?connection_id=${authUrlParams.connection_id}`;
@@ -45,8 +52,8 @@ const Login = () => {
           <div className="mt-6">
             <div className="relative flex justify-center text-sm">
               <span className="px-2 text-gray-400">
-                Don't have an account?{" "}
-                <Link to="/register" className="font-medium text-primary hover:text-primary-hover">
+                Already have an account?{" "}
+                <Link to="/login" className="font-medium text-primary hover:text-primary-hover">
                   Sign up
                 </Link>
               </span>
@@ -58,4 +65,12 @@ const Login = () => {
   );
 };
 
-export default Login;
+// export default Login;
+// function getKindeSession(request: Request): { isAuthenticated: any; } | PromiseLike<{ isAuthenticated: any; }> {
+//   throw new Error("Function not implemented.");
+// }
+
+// function redirect(arg0: string) {
+//   throw new Error("Function not implemented.");
+// }
+

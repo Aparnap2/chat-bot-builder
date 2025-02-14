@@ -1,8 +1,17 @@
 import { useState } from "react";
-import { Link } from "@remix-run/react";
+import { json, Link, redirect } from "@remix-run/react";
 import { toast } from "react-hot-toast";
 import { ArrowRight } from "lucide-react";
+import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
+import { LoaderFunctionArgs } from "@remix-run/node";
 
+
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const { isAuthenticated } = await getKindeSession(request);
+  if (await isAuthenticated()) throw redirect("/profile");
+  return json({});
+};
 function login({ authUrlParams }: { authUrlParams: { connection_id: string } }) {
   // Construct the URL with the given connection_id
   const url = `/kinde-auth/login?connection_id=${authUrlParams.connection_id}`;

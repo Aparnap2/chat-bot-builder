@@ -3,18 +3,15 @@ import prisma from "~/utils/prisma.server";
 import { rateLimiter } from "~/utils/redis.server";
 import { v4 as uuidv4 } from "uuid";
 
+// chatbot.ts
 export async function loader({ request }: LoaderFunctionArgs) {
-  const userId = request.headers.get("x-user-id");
-  if (!userId) return json({ error: "Not authenticated" }, { status: 401 });
-  const ip = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown";
-  if (!(await rateLimiter(ip))) return json({ error: "Rate limit exceeded" }, { status: 429 });
-  
+  const user = await requireAuth(request);
+  // Replace header checks with:
   const chatbots = await prisma.chatbot.findMany({
-    where: { ownerId: userId },
+    where: { ownerId: user.id },
   });
   return json(chatbots);
 }
-
 export const action: ActionFunction = async ({ request }) => {
   const userId = request.headers.get("x-user-id");
   if (!userId) return json({ error: "Not authenticated" }, { status: 401 });
@@ -35,3 +32,7 @@ export const action: ActionFunction = async ({ request }) => {
   });
   return json(chatbot);
 };
+function requireAuth(request: Request) {
+  throw new Error("Function not implemented.");
+}
+

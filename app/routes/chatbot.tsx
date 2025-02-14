@@ -114,13 +114,7 @@ const CustomizationPanel = () => {
             activeTab={activeTab}
             setActiveTab={setActiveTab}
           />
-          <Tab
-            id="theme"
-            label="Theme"
-            icon={<Layers />}
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-          />
+          
           <Tab
             id="prompt-engineering"
             label="Prompt Engineering"
