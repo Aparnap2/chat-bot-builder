@@ -5,7 +5,7 @@ import { Bot, BarChart2, Settings, ArrowRight } from "lucide-react";
 const Index = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background/95 to-background/90">
-      <Navbar />
+      <Navbar authenticated={false} />
       
       {/* Hero Section */}
       <div className="relative overflow-hidden">

@@ -28,3 +28,28 @@ model Chatbot {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 }
+model ChatSettings {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String   @unique
+  brandColor      String   @default("#007AFF")
+  chatBackground  String   @default("#ffffff")
+  chatOpacity     Float    @default(1)
+  chatBorderRadius Int     @default(8)
+  customLogo      String?
+  fontSize        Int      @default(14)
+  fontFamily      String   @default("Inter")
+  chatWidth       Int      @default(360)
+  chatHeight      Int      @default(600)
+  showEmailCapture Boolean @default(false)
+  emailPlaceholder String  @default("Enter your email")
+  quickReplies    Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model EmailCapture {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String
+  email     String
+  createdAt DateTime @default(now())
+}

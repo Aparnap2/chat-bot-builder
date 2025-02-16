@@ -4,13 +4,15 @@ import { toast } from "react-hot-toast";
 import { ArrowRight } from "lucide-react";
 import { LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
+
 // login.tsx & register.tsx
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { isAuthenticated } = await getKindeSession(request);
-  if (await isAuthenticated()) throw redirect("/profile");
-  return json({});
+  const session = await getKindeSession(request);
+  const isAuthenticated = session.isAuthenticated;
+  return json({ authenticated: isAuthenticated });
+
 };
-function login({ authUrlParams }: { authUrlParams: { connection_id: string } }) {
+function register({ authUrlParams }: { authUrlParams: { connection_id: string } }) {
   // Construct the URL with the given connection_id
   const url = `/kinde-auth/register?connection_id=${authUrlParams.connection_id}`;
   // Optionally show a toast message
@@ -19,7 +21,7 @@ function login({ authUrlParams }: { authUrlParams: { connection_id: string } }) 
   window.location.href = url;
 }
 
-const Login = () => {
+export const Register = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -39,7 +41,7 @@ const Login = () => {
           {/* Instead of a full form, we now simply offer a button to trigger Google auth */}
           <button
             onClick={() =>
-              login({
+              register({
                 authUrlParams: {
                   connection_id: "conn_0190c847b77996ef9532a4f639f1bd5a",
                 },
@@ -65,12 +67,5 @@ const Login = () => {
   );
 };
 
-// export default Login;
-// function getKindeSession(request: Request): { isAuthenticated: any; } | PromiseLike<{ isAuthenticated: any; }> {
-//   throw new Error("Function not implemented.");
-// }
 
-// function redirect(arg0: string) {
-//   throw new Error("Function not implemented.");
-// }
 

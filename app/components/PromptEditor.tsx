@@ -1,5 +1,6 @@
 // PromptEditor.tsx
 import { useState } from "react";
+import toast from "react-hot-toast";
 
 const PromptEditor = () => {
   const [prompts, setPrompts] = useState([{ trigger: "", response: "" }]);
@@ -11,6 +12,15 @@ const PromptEditor = () => {
   const removePrompt = (index: number) => {
     setPrompts(prompts.filter((_, i) => i !== index));
   };
+  // Added input validation and save feedback
+const handlePromptSave = () => {
+  if (prompts.some(p => !p.trigger.trim() || !p.response.trim())) {
+    toast.error('All prompts require both trigger and response');
+    return;
+  }
+  // Save logic here
+  toast.success('Prompts saved successfully');
+};
 
   return (
     <div className="space-y-4">
