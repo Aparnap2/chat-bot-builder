@@ -1,12 +1,10 @@
-// prisma/schema.prisma
-datasource db {
-  provider  = "mongodb"
-  url       = env("DATABASE_URL")
-  
-}
-
 generator client {
   provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -15,41 +13,52 @@ model User {
   email     String    @unique
   name      String?
   createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
   chatbots  Chatbot[]
 }
 
 model Chatbot {
-  id               String    @id @default(auto()) @map("_id") @db.ObjectId
-  name             String
-  connectionString String    @unique
-  ownerId          String    @db.ObjectId
-  owner            User      @relation(fields: [ownerId], references: [id])
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-}
-model ChatSettings {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId          String   @unique
-  brandColor      String   @default("#007AFF")
-  chatBackground  String   @default("#ffffff")
-  chatOpacity     Float    @default(1)
-  chatBorderRadius Int     @default(8)
-  customLogo      String?
-  fontSize        Int      @default(14)
-  fontFamily      String   @default("Inter")
-  chatWidth       Int      @default(360)
-  chatHeight      Int      @default(600)
-  showEmailCapture Boolean @default(false)
-  emailPlaceholder String  @default("Enter your email")
-  quickReplies    Json?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  name            String
+  connectionString String       @unique
+  userId          String
+  user            User          @relation(fields: [userId], references: [kindeId])
+  settings        ChatSettings?
+  conversations   Conversation[]
+  createdAt       DateTime      @default(now())
 }
 
-model EmailCapture {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String
-  email     String
-  createdAt DateTime @default(now())
+model ChatSettings {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  chatbotId        String   @unique @db.ObjectId
+  chatbot          Chatbot  @relation(fields: [chatbotId], references: [id])
+  brandColor       String
+  chatBackground   String
+  chatOpacity      Float
+  chatBorderRadius Int
+  customLogo       String?
+  chatWidth        Int      @default(300)
+  chatHeight       Int      @default(400)
+  showEmailCapture Boolean  @default(false)
+  emailPlaceholder String   @default("Enter your email")
+  quickReplies     Json
+  userBubbleColor String @default("#e0e0e0")
+  aiBubbleColor   String @default("#2563eb")
+  headingColor    String @default("#000000")
+}
+
+model Conversation {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  chatbotId String    @db.ObjectId
+  createdAt  DateTime @default(now())
+  chatbot   Chatbot   @relation(fields: [chatbotId], references: [id])
+  messages  Message[]
+}
+
+model Message {
+  id            String      @id @default(auto()) @map("_id") @db.ObjectId
+  conversationId String     @db.ObjectId
+  conversation  Conversation @relation(fields: [conversationId], references: [id])
+  content       String
+  role          String
+  createdAt     DateTime    @default(now())
 }

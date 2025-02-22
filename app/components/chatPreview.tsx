@@ -1,126 +1,95 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useState } from "react";
+import { Trash2 } from "lucide-react";
+import { Message, ChatSettings } from "~/types/types"; // Import centralized types
 
 interface ChatPreviewProps {
-  settings: {
-    chatWidth?: number;
-    chatHeight?: number;
-    chatBackground: string;
-    chatOpacity: number;
-    chatBorderRadius: number;
-    brandColor: string;
-    customLogo?: string;
-    showEmailCapture: boolean;
-    emailPlaceholder: string;
-    quickReplies: Array<{ text: string; action: string }>;
-    onEmailCapture: (value: string) => void;
-  };
-  messages: Array<{ content: string; isUser: boolean; timestamp?: number }>;
+  messages: Message[]; // Use the Message type from types.ts
   onSendMessage: (message: string) => void;
+  settings: ChatSettings;
+  isLoading?: boolean;
 }
 
-export const ChatPreview: React.FC<ChatPreviewProps> = ({
-  settings,
-  messages,
-  onSendMessage,
-}) => {
-  const [inputValue, setInputValue] = useState("");
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+export const ChatPreview = ({ messages, onSendMessage, settings, isLoading }: ChatPreviewProps) => {
+  const [email, setEmail] = useState("");
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const formatTimestamp = (timestamp: number) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString();
+  const handleSuggestionClick = (text: string) => {
+    onSendMessage(text);
   };
 
   return (
-    <div 
-      className="relative rounded-lg overflow-hidden shadow-lg"
+    <div
+      className="chat-preview relative"
       style={{
-        width: settings.chatWidth || 360,
-        height: settings.chatHeight || 600,
-        backgroundColor: settings.chatBackground,
+        width: `${settings.chatWidth}px`,
+        height: `${settings.chatHeight}px`,
+        background: settings.chatBackground,
         opacity: settings.chatOpacity,
-        borderRadius: settings.chatBorderRadius,
+        borderRadius: `${settings.chatBorderRadius}px`,
+        boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
       }}
     >
-      {/* Header */}
-      <div className="p-4 flex items-center space-x-2" style={{ backgroundColor: settings.brandColor }}>
+      <div
+        className="header p-3 flex items-center"
+        style={{
+          background: settings.brandColor,
+          color: settings.headingColor,
+          borderRadius: `${settings.chatBorderRadius}px ${settings.chatBorderRadius}px 0 0`,
+        }}
+      >
         {settings.customLogo && (
-          <img src={settings.customLogo} alt="Logo" className="h-8 w-8 object-contain" />
+          <img src={settings.customLogo} alt="Logo" className="w-8 h-8 mr-2 rounded-full" />
         )}
-        <span className="text-white font-medium">Chat Preview</span>
+        <h3 className="text-lg font-semibold">Chatbot</h3>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((message, index) => (
-          <div key={index} className={`chat ${message.isUser ? 'chat-end' : 'chat-start'}`}>
-            <div className="chat-bubble">
-              {message.content}
-              {message.timestamp && (
-                <div className="chat-time">{formatTimestamp(message.timestamp)}</div>
-              )}
-            </div>
+      <div className="messages p-4 overflow-y-auto" style={{ height: `${settings.chatHeight - 150}px` }}>
+        {messages.map((msg) => (
+          <div
+            key={msg.id || msg.content}
+            className={`message mb-2 p-3 rounded-lg ${msg.role === "user" ? "ml-auto" : "mr-auto"}`}
+            style={{
+              background: msg.role === "user" ? settings.userBubbleColor : settings.aiBubbleColor,
+              maxWidth: "80%",
+              color: "#000000",
+            }}
+          >
+            <p>{msg.content}</p>
+            <small className="text-xs opacity-70 block mt-1">
+              {(msg.createdAt instanceof Date ? msg.createdAt : new Date(msg.createdAt)).toLocaleTimeString()}
+            </small>
           </div>
         ))}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input Area */}
-      <div className="border-t p-4">
-        {settings.showEmailCapture && (
-          <div className="mb-4">
-            <input
-              type="email"
-              placeholder={settings.emailPlaceholder}
-              onChange={(e) => settings.onEmailCapture(e.target.value)}
-              className="w-full px-4 py-2 rounded border"
-            />
+        {isLoading && (
+          <div className="message mb-2 p-3 rounded-lg mr-auto" style={{ background: settings.aiBubbleColor }}>
+            <span className="loading loading-spinner"></span>
           </div>
         )}
-        <div className="flex space-x-2">
-          <input
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            className="flex-1 px-4 py-2 rounded border"
-            placeholder="Type your message..."
-          />
-          <button
-            onClick={() => {
-              onSendMessage(inputValue);
-              setInputValue("");
-            }}
-            className="px-4 py-2 rounded text-white"
-            style={{ backgroundColor: settings.brandColor }}
-          >
-            Send
-          </button>
-        </div>
       </div>
 
-      {/* Quick Replies */}
-      {settings.quickReplies.length > 0 && (
-        <div className="p-4 flex flex-wrap gap-2">
-          {settings.quickReplies.map((reply, index) => (
-            <button
-              key={index}
-              onClick={() => onSendMessage(reply.text)}
-              className="px-4 py-2 rounded-full text-white text-sm"
-              style={{ backgroundColor: settings.brandColor }}
-            >
-              {reply.text}
-            </button>
-          ))}
+      {settings.showEmailCapture && !email && (
+        <div className="email-capture p-4">
+          <input
+            type="email"
+            placeholder={settings.emailPlaceholder}
+            className="input input-bordered w-full"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
         </div>
       )}
+
+      <div className="suggestions p-4 border-t">
+        {settings.quickReplies.map((reply, index) => (
+          <button
+            key={index}
+            className="btn btn-sm btn-outline mr-2 mb-2"
+            onClick={() => handleSuggestionClick(reply.text)}
+            style={{ background: settings.brandColor, color: "#ffffff", borderColor: settings.brandColor }}
+          >
+            {reply.text}
+          </button>
+        ))}
+      </div>
     </div>
   );
 };

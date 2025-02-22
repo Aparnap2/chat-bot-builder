@@ -1,12 +1,11 @@
-import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { useState, useEffect } from "react";
 
 interface ChatSettings {
   brandColor: string;
   chatBackground: string;
   chatOpacity: number;
   chatBorderRadius: number;
-  customLogo: string;
+  customLogo?: string;
   fontSize: number;
   fontFamily: string;
   chatWidth: number;
@@ -14,53 +13,64 @@ interface ChatSettings {
   showEmailCapture: boolean;
   emailPlaceholder: string;
   quickReplies: Array<{ text: string; action: string }>;
+  capturedEmail?: string;
 }
 
-interface ChatSettingsStore extends ChatSettings {
-  setBrandColor: (color: string) => void;
-  setChatBackground: (background: string) => void;
-  setChatOpacity: (opacity: number) => void;
-  setChatBorderRadius: (radius: number) => void;
-  setCustomLogo: (logo: string) => void;
-  setFontSize: (size: number) => void;
-  setFontFamily: (family: string) => void;
-  setChatWidth: (width: number) => void;
-  setChatHeight: (height: number) => void;
-  setShowEmailCapture: (show: boolean) => void;
-  setEmailPlaceholder: (placeholder: string) => void;
-  setQuickReplies: (replies: Array<{ text: string; action: string }>) => void;
-}
+export function useChatSettings() {
+  const [settings, setSettings] = useState<ChatSettings>(() => {
+    // Load initial settings from localStorage or defaults
+    const saved = localStorage.getItem("chatSettings");
+    return saved
+      ? JSON.parse(saved)
+      : {
+          brandColor: "#2563eb",
+          chatBackground: "#ffffff",
+          chatOpacity: 1.0,
+          chatBorderRadius: 8,
+          customLogo: undefined,
+          fontSize: 16,
+          fontFamily: "Inter",
+          chatWidth: 400,
+          chatHeight: 600,
+          showEmailCapture: false,
+          emailPlaceholder: "Enter your email...",
+          quickReplies: [],
+          capturedEmail: undefined,
+        };
+  });
 
-export const useChatSettings = create<ChatSettingsStore>()(
-  persist(
-    (set) => ({
-      brandColor: "#007AFF",
-      chatBackground: "#ffffff",
-      chatOpacity: 1,
-      chatBorderRadius: 8,
-      customLogo: "",
-      fontSize: 14,
-      fontFamily: "Inter, sans-serif",
-      chatWidth: 360,
-      chatHeight: 600,
-      showEmailCapture: false,
-      emailPlaceholder: "Enter your email",
-      quickReplies: [],
-      setBrandColor: (color) => set(() => ({ brandColor: color })),
-      setChatBackground: (background) => set(() => ({ chatBackground: background })),
-      setChatOpacity: (opacity) => set(() => ({ chatOpacity: opacity })),
-      setChatBorderRadius: (radius) => set(() => ({ chatBorderRadius: radius })),
-      setCustomLogo: (logo) => set(() => ({ customLogo: logo })),
-      setFontSize: (size) => set(() => ({ fontSize: size })),
-      setFontFamily: (family) => set(() => ({ fontFamily: family })),
-      setChatWidth: (width) => set(() => ({ chatWidth: width })),
-      setChatHeight: (height) => set(() => ({ chatHeight: height })),
-      setShowEmailCapture: (show) => set(() => ({ showEmailCapture: show })),
-      setEmailPlaceholder: (placeholder) => set(() => ({ emailPlaceholder: placeholder })),
-      setQuickReplies: (replies) => set(() => ({ quickReplies: replies })),
-    }),
-    {
-      name: "chat-settings",
-    }
-  )
-);
+  useEffect(() => {
+    // Persist settings to localStorage
+    localStorage.setItem("chatSettings", JSON.stringify(settings));
+  }, [settings]);
+
+  return {
+    brandColor: settings.brandColor,
+    setBrandColor: (value: string) => setSettings((prev) => ({ ...prev, brandColor: value })),
+    chatBackground: settings.chatBackground,
+    setChatBackground: (value: string) => setSettings((prev) => ({ ...prev, chatBackground: value })),
+    chatOpacity: settings.chatOpacity,
+    setChatOpacity: (value: number) => setSettings((prev) => ({ ...prev, chatOpacity: value })),
+    chatBorderRadius: settings.chatBorderRadius,
+    setChatBorderRadius: (value: number) => setSettings((prev) => ({ ...prev, chatBorderRadius: value })),
+    customLogo: settings.customLogo,
+    setCustomLogo: (value?: string) => setSettings((prev) => ({ ...prev, customLogo: value })),
+    fontSize: settings.fontSize,
+    setFontSize: (value: number) => setSettings((prev) => ({ ...prev, fontSize: value })),
+    fontFamily: settings.fontFamily,
+    setFontFamily: (value: string) => setSettings((prev) => ({ ...prev, fontFamily: value })),
+    chatWidth: settings.chatWidth,
+    setChatWidth: (value: number) => setSettings((prev) => ({ ...prev, chatWidth: value })),
+    chatHeight: settings.chatHeight,
+    setChatHeight: (value: number) => setSettings((prev) => ({ ...prev, chatHeight: value })),
+    showEmailCapture: settings.showEmailCapture,
+    setShowEmailCapture: (value: boolean) => setSettings((prev) => ({ ...prev, showEmailCapture: value })),
+    emailPlaceholder: settings.emailPlaceholder,
+    setEmailPlaceholder: (value: string) => setSettings((prev) => ({ ...prev, emailPlaceholder: value })),
+    quickReplies: settings.quickReplies,
+    setQuickReplies: (value: Array<{ text: string; action: string }>) =>
+      setSettings((prev) => ({ ...prev, quickReplies: value })),
+    capturedEmail: settings.capturedEmail,
+    setCapturedEmail: (value?: string) => setSettings((prev) => ({ ...prev, capturedEmail: value })),
+  };
+}

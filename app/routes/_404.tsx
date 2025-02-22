@@ -23,11 +23,11 @@ const NotFound = () => {
           <p className="text-gray-400">
             The page you're looking for doesn't exist or has been moved.
           </p>
-
+          
           {/* Conditionally display error details in development */}
-          {process.env.NODE_ENV === "development" && (
+          {import.meta.env.DEV && (
             <pre className="bg-gray-700 text-white p-4 rounded mt-4"> {/* Added some styling */}
-              {error?.data?.message || "No error message available"}
+              {error.data || "No error message available"}
             </pre>
           )}
 

@@ -1,12 +1,46 @@
-import { Link } from "@remix-run/react";
-import { Navbar } from "../components/layout/navbar";
+// app/routes/index.tsx
+import { useEffect } from "react";
+import { Link, useNavigate } from "@remix-run/react";
+import { LoaderFunctionArgs, json, redirect } from "@remix-run/node";
+import { Navbar } from "~/components/layout/navbar";
 import { Bot, BarChart2, Settings, ArrowRight } from "lucide-react";
+import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
 
-const Index = () => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const { isAuthenticated } = await getKindeSession(request);
+  if (await isAuthenticated()) {
+    return redirect("/profile");
+  }
+  return json({});
+};
+
+export default function Index() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Check local storage for user data
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      const user = JSON.parse(storedUser);
+      if (user?.id && user?.email) {
+        // Auto-redirect to /profile if user data exists
+        navigate("/profile");
+      }
+    }
+  }, [navigate]);
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background/95 to-background/90">
-      <Navbar authenticated={false} />
-      
+    <div className="min-h-screen bg-gradient-to-b from-background via-background/95 to-background/90 relative">
+      <Navbar />
+      {/* 3D Elements */}
+      <div className="hidden lg:block absolute inset-0 overflow-hidden">
+        <div className="parallax-layer absolute inset-0">
+          <div className="cube-1"></div>
+          <div className="cube-2"></div>
+          <div className="cube-3"></div>
+        </div>
+      </div>
+
       {/* Hero Section */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.1)_0,transparent_70%)]" />
@@ -74,5 +108,4 @@ const Index = () => {
       </div>
     </div>
   );
-};
-export default Index;
+}

@@ -1,0 +1,3262 @@
+// app/routes/login.tsx
+import { useState } from "react";
+import { json, Link, redirect } from "@remix-run/react";
+import { toast } from "react-hot-toast";
+import { ArrowRight } from "lucide-react";
+import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
+import { LoaderFunctionArgs } from "@remix-run/node";
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const { isAuthenticated } = await getKindeSession(request);
+  if (await isAuthenticated()) throw redirect("/profile");
+  return json({});
+};
+
+function login({ authUrlParams }: { authUrlParams: { connection_id: string } }) {
+  const url = `/kinde-auth/login?connection_id=${authUrlParams.connection_id}`;
+  toast("Redirecting to Google sign in...");
+  window.location.href = url;
+}
+
+const Login = () => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-background via-background/95 to-background/90 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.1)_0,transparent_70%)]" />
+      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
+        <div className="hidden lg:block absolute inset-0 overflow-hidden">
+          <div className="parallax-layer absolute inset-0">
+            <div className="cube-1"></div>
+            <div className="cube-2"></div>
+            <div className="cube-3"></div>
+          </div>
+        </div>
+        <h2 className="text-center text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+          Welcome back
+        </h2>
+      </div>
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
+        <div className="glass-card py-8 px-4 shadow-2xl sm:rounded-2xl sm:px-10">
+          <button
+            onClick={() =>
+              login({
+                authUrlParams: {
+                  connection_id: "conn_0190c847b77996ef9532a4f639f1bd5a",
+                },
+              })
+            }
+            className="neo-brutalism w-full flex justify-center items-center gap-2 py-2 px-4 bg-primary text-slate-900 text-sm font-medium rounded-xl"
+          >
+            Sign in with Google <ArrowRight className="w-4 h-4" />
+          </button>
+          <div className="mt-6">
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 text-gray-400">
+                Don't have an account?{" "}
+                <Link to="/register" className="font-medium text-primary hover:text-primary-hover">
+                  Sign up
+                </Link>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Login;// app/routes/dashboard.tsx
+import { json, redirect } from "@remix-run/node";
+import type { LoaderFunction } from "@remix-run/node";
+import { Link, useLoaderData } from "@remix-run/react";
+import { PlusIcon } from "lucide-react";
+import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
+import prisma from "~/utils/prisma.server";
+
+export const loader: LoaderFunction = async ({ request }) => {
+  const session = await getKindeSession(request);
+  const user = await session.getUser();
+  if (!user) throw redirect("/login");
+
+  const chatbots = await prisma.chatbot.findMany({
+    where: { userId: user.id },
+    select: { id: true, name: true, createdAt: true, connectionString: true },
+  });
+
+  const chatbotIds = chatbots.map((c) => c.id);
+  const totalMessages = await prisma.message.count({
+    where: { conversation: { chatbotId: { in: chatbotIds } } },
+  });
+  const totalConversations = await prisma.conversation.count({
+    where: { chatbotId: { in: chatbotIds } },
+  });
+
+  return json({
+    user: { email: user.email, name: user.given_name || user.email },
+    chatbots: chatbots.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() })),
+    metrics: { totalMessages, totalConversations, chatbotCount: chatbots.length },
+  });
+};
+
+export default function Dashboard() {
+  const { user, chatbots, metrics } = useLoaderData<typeof loader>();
+
+  return (
+    <div className="min-h-screen bg-base-100 p-4 md:p-8">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="stats shadow bg-base-100">
+            <div className="stat">
+              <div className="stat-title">Chatbots</div>
+              <div className="stat-value">{metrics.chatbotCount}</div>
+            </div>
+          </div>
+          <div className="stats shadow bg-base-100">
+            <div className="stat">
+              <div className="stat-title">Total Messages</div>
+              <div className="stat-value">{metrics.totalMessages}</div>
+            </div>
+          </div>
+          <div className="stats shadow bg-base-100">
+            <div className="stat">
+              <div className="stat-title">Conversations</div>
+              <div className="stat-value">{metrics.totalConversations}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="card bg-base-100 shadow-sm mb-8">
+          <div className="card-body">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="card-title">Your Chatbots</h2>
+              <Link to="/chatbot/new" className="btn btn-primary gap-2">
+                <PlusIcon className="w-4 h-4" />
+                New Chatbot
+              </Link>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="table table-zebra">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th className="hidden md:table-cell">Created</th>
+                    <th>API Key</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {chatbots.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="text-center">
+                        No chatbots yet. Create one above!
+                      </td>
+                    </tr>
+                  ) : (
+                    chatbots.map((bot: any) => (
+                      <tr key={bot.id}>
+                        <td>{bot.name}</td>
+                        <td className="hidden md:table-cell">{new Date(bot.createdAt).toLocaleDateString()}</td>
+                        <td>
+                          <div className="badge badge-ghost font-mono truncate max-w-[120px]">{bot.connectionString}</div>
+                        </td>
+                        <td>
+                          <Link to={`/chatbot/${bot.id}`} className="btn btn-ghost btn-xs mr-2">Manage</Link>
+                          <Link to={`/chatbot/${bot.id}/customize`} className="btn btn-ghost btn-xs">Customize</Link>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}// app/routes/index.tsx
+import { Link } from "@remix-run/react";
+import { Navbar } from "../components/layout/navbar";
+import { Bot, BarChart2, Settings, ArrowRight } from "lucide-react";
+
+const Index = () => {
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-background via-background/95 to-background/90 relative">
+      {/* 3D Elements */}
+      <div className="hidden lg:block absolute inset-0 overflow-hidden">
+        <div className="parallax-layer absolute inset-0">
+          <div className="cube-1"></div>
+          <div className="cube-2"></div>
+          <div className="cube-3"></div>
+        </div>
+      </div>
+
+     
+
+      {/* Hero Section */}
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.1)_0,transparent_70%)]" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+          <div className="text-center relative z-10">
+            <div className="glass-card max-w-3xl mx-auto p-8 rounded-2xl mb-12">
+              <h1 className="text-4xl sm:text-6xl font-bold mb-8 bg-gradient-to-r from-primary via-secondary to-primary bg-[200%_auto] animate-gradient-rotate bg-clip-text text-transparent">
+                Build Intelligent Chatbots
+                <br />
+                Without Code
+              </h1>
+              <p className="text-xl text-gray-400 mb-8">
+                Create, customize, and deploy AI-powered chatbots in minutes.
+                <br />
+                No coding required.
+              </p>
+              <Link
+                to="/register"
+                className="neo-brutalism inline-flex items-center gap-2 bg-primary text-gray-900 text-lg px-8 py-3 rounded-xl"
+              >
+                Get Started Free
+                <ArrowRight className="w-5 h-5" />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Features Section */}
+      <div className="py-24 relative">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.1)_0,transparent_70%)]" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+              Everything you need to build amazing chatbots
+            </h2>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="glass-card p-8 rounded-xl hover:scale-105 transition-transform duration-300">
+              <Bot className="w-12 h-12 text-primary mb-6" />
+              <h3 className="text-xl font-semibold mb-4 text-white">Visual Builder</h3>
+              <p className="text-gray-400">
+                Drag and drop interface to build conversational flows easily
+              </p>
+            </div>
+            
+            <div className="glass-card p-8 rounded-xl hover:scale-105 transition-transform duration-300">
+              <BarChart2 className="w-12 h-12 text-secondary mb-6" />
+              <h3 className="text-xl font-semibold mb-4 text-white">Analytics</h3>
+              <p className="text-gray-400">
+                Track performance and optimize your chatbots with detailed insights
+              </p>
+            </div>
+            
+            <div className="glass-card p-8 rounded-xl hover:scale-105 transition-transform duration-300">
+              <Settings className="w-12 h-12 text-primary mb-6" />
+              <h3 className="text-xl font-semibold mb-4 text-white">Customization</h3>
+              <p className="text-gray-400">
+                Personalize every aspect of your chatbot to match your brand
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Index;
+import type { LoaderFunctionArgs } from "@remix-run/node";
+import { json, redirect } from "@remix-run/node";
+import { useLoaderData } from "@remix-run/react";
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  // Assume admin access is determined by an "x-admin" header.
+  const isAdmin = request.headers.get("x-admin") === "true";
+  if (!isAdmin) throw redirect("/");
+  const metrics = {
+    uptime: process.uptime(),
+    memoryUsage: process.memoryUsage(),
+    activeChatbots: 42, // placeholder value
+  };
+  return json({ metrics });
+};
+
+const Admin = () => {
+  const { metrics } = useLoaderData<typeof loader>();
+  return (
+    <div className="p-8">
+      <h2 className="text-3xl font-bold mb-4">Admin Dashboard</h2>
+      <p>Uptime: {metrics.uptime.toFixed(2)} seconds</p>
+      <p>Memory Usage: {JSON.stringify(metrics.memoryUsage)}</p>
+      <p>Active Chatbots: {metrics.activeChatbots}</p>
+    </div>
+  );
+};
+
+export default Admin;
+// app/routes/kinde-auth.$index.tsx
+import { handleAuth } from "@kinde-oss/kinde-remix-sdk";
+import type { LoaderFunctionArgs } from "@remix-run/node";
+import  prisma  from "~/utils/prisma.server";
+
+async function upsertUser(user: any) {
+  if (!user || !user.id) {
+    throw new Error("No user data available");
+  }
+  try {
+    const existingUser = await prisma.user.findUnique({
+      where: { email: user.email },
+    });
+    if (existingUser) {
+      await prisma.user.update({
+        where: { email: user.email },
+        data: {
+          email: user.email,
+          name: user.name || "",
+        },
+      });
+    } else {
+      await prisma.user.create({
+        data: {
+          kindeId: user.id,
+          email: user.email,
+          name: user.name || "",
+        },
+      });
+    }
+  } catch (error) {
+    console.error("Error saving user to database:", error);
+    throw error;
+  }
+}
+
+export async function loader({ params, request }: LoaderFunctionArgs) {
+  return await handleAuth(request, params.index, {
+    async onRedirectCallback({ user }: { user: { id: string; email: string; name?: string } }) {
+      await upsertUser(user);
+    },
+  });
+}
+
+export async function action({ params, request }: LoaderFunctionArgs) {
+  return await handleAuth(request, params.index, {
+    async onRedirectCallback({ user }: { user: { id: string; email: string; name?: string } }) {
+      await upsertUser(user);
+    },
+  });
+}
+import type { LoaderFunctionArgs } from "@remix-run/node";
+import { json, redirect } from "@remix-run/node";
+import { useLoaderData } from "@remix-run/react";
+import { Link } from "@remix-run/react";
+import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
+import prisma from "../utils/prisma.server";
+import { Settings, BarChart2 } from "lucide-react";
+import { Navbar } from "~/components/layout/navbar";
+
+// Define types for the loader data
+type LoaderData = {
+  user: {
+    id: string;
+    email: string;
+    createdAt: Date;
+  };
+  kindeUser: {
+    id: string;
+    given_name: string;
+    family_name: string;
+    email: string;
+    picture: string;
+  };
+  userProfile: any; // Type this according to your needs
+};
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const { getUser, getUserProfile, isAuthenticated, headers } = await getKindeSession(request);
+
+  // Check authentication first
+  if (!(await isAuthenticated())) {
+    throw redirect("/login", { headers });
+  }
+  const sessionUser = await getUser();
+  const userProfile = await getUserProfile();
+  if (!sessionUser) {
+    throw redirect("/login", { headers });
+  }
+  const user = await prisma.user.findUnique({
+    where: { email: sessionUser.email },
+  });
+  if (!user) {
+    throw redirect("/register", { headers });
+  }
+  return json({ user, kindeUser: sessionUser, userProfile }, { headers });
+};
+
+const Profile = () => {
+  const { user, kindeUser, userProfile } = useLoaderData<LoaderData>();
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-background via-background/95 to-background/90">
+      {/* Navbar */}
+ {/* 3D Elements */}
+ <div className="hidden lg:block absolute inset-0 overflow-hidden">
+        <div className="parallax-layer absolute inset-0">
+          <div className="cube-1"></div>
+          <div className="cube-2"></div>
+          <div className="cube-3"></div>
+        </div>
+      </div>
+      {/* Profile Section */}
+   
+      <div className="relative overflow-hidden py-24">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.1)_0,transparent_70%)]" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center relative z-10">
+            <div className="glass-card max-w-3xl mx-auto p-8 rounded-2xl mb-12">
+              
+              {/* Header */}
+              <div className="flex flex-col md:flex-row items-center justify-between mb-8">
+                <div className="flex items-center space-x-4">
+                  {kindeUser.picture && (
+                    <img
+                      src={kindeUser.picture}
+                      alt="Profile"
+                      className="w-16 h-16 rounded-full border-2 border-primary"
+                    />
+                  )}
+                  <div>
+                    <h2 className="text-3xl sm:text-4xl font-bold text-white">
+                      Welcome, {kindeUser.given_name || "User"}
+                    </h2>
+                    <p className="text-lg text-gray-400">
+                      Manage your account and access tools to customize and analyze your chatbots.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* User Details */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-gray-700 py-2">
+                  <span className="text-lg font-semibold text-white">Name</span>
+                  <span className="text-lg text-gray-300">
+                    {`${kindeUser.given_name} ${kindeUser.family_name || "Not provided"}`}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between border-b border-gray-700 py-2">
+                  <span className="text-lg font-semibold text-white">Email</span>
+                  <span className="text-lg text-gray-300">{kindeUser.email}</span>
+                </div>
+                
+                <div className="flex items-center justify-between border-b border-gray-700 py-2">
+                  <span className="text-lg font-semibold text-white">Account Created</span>
+                  <span className="text-lg text-gray-300">
+                    {new Date(user.createdAt).toLocaleDateString("en-US", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between py-2">
+                  <span className="text-lg font-semibold text-white">Profile Status</span>
+                  <span className="text-lg text-green-400 font-medium">Active</span>
+                </div>
+              </div>
+
+              {/* Navigation Buttons */}
+              <div className="flex flex-col md:flex-row gap-4 justify-center mt-8">
+                <Link
+                  to="/customization"
+                  className="neo-brutalism inline-flex items-center gap-2 bg-primary text-gray-900 text-lg px-8 py-3 rounded-xl"
+                >
+                  <Settings className="w-5 h-5" />
+                  Chatbot Customization
+                </Link>
+                <Link
+                  to="/dashboard"
+                  className="neo-brutalism inline-flex items-center gap-2 bg-secondary text-gray-900 text-lg px-8 py-3 rounded-xl"
+                >
+                  <BarChart2 className="w-5 h-5" />
+                  Analyze Dashboard Panel
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Profile;// app/routes/api/embed.$id.tsx
+import { json, LoaderFunctionArgs } from "@remix-run/node";
+import prisma from "~/utils/prisma.server";
+import { requireAuth } from "~/utils/auth.server";
+import { generateEmbedCode } from "~/utils/embed.server";
+import { Logger } from "~/utils/logger.server";
+import { ChatSettings, EmbedCode } from "~/types/types";
+
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+  const user = await requireAuth(request); // Now guaranteed to be non-null
+  const chatbot = await prisma.chatbot.findFirst({
+    where: { id: params.id, userId: user.id },
+    include: { settings: true },
+  });
+
+  if (!chatbot || !chatbot.settings) {
+    Logger.warn("Chatbot or settings not found", { chatbotId: params.id });
+    return json({ error: "Chatbot not found" }, { status: 404 });
+  }
+
+  const embedCode: EmbedCode = generateEmbedCode(chatbot.settings as ChatSettings, chatbot.connectionString);
+  Logger.info("Embed code generated", { chatbotId: params.id });
+  return json(embedCode);
+};// app/graphql/client.server.ts
+import { ApolloClient, InMemoryCache } from '@apollo/client';
+import { SchemaLink } from '@apollo/client/link/schema';
+import { schema } from '../../graphql/schema';
+
+// Create an Apollo Client instance with SchemaLink, passing the user context
+export function createClient(user: any) {
+  return new ApolloClient({
+    cache: new InMemoryCache(),
+    ssrMode: true, // Enable SSR mode for server-side rendering
+    link: new SchemaLink({
+      schema,
+      context: () => ({ user }), // Provide user context to resolvers
+    }),
+  });
+}// app/routes/api/chatbot.$id.tsx
+import { json, redirect } from "@remix-run/node";
+import type { ActionFunction, LoaderFunction } from "@remix-run/node";
+import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
+import { rateLimiter } from "~/utils/redis.server";
+import prisma from "~/utils/prisma.server";
+import { generateResponse } from "~/utils/gemini.server";
+
+export const loader: LoaderFunction = async ({ request, params }) => {
+  const session = await getKindeSession(request);
+  const user = await session.getUser();
+  if (!user) throw redirect("/login");
+
+  const chatbot = await prisma.chatbot.findFirst({
+    where: { id: params.id, userId: user.id },
+    include: {
+      settings: true,
+      conversations: { include: { messages: { orderBy: { createdAt: "asc" } } } },
+    },
+  });
+
+  if (!chatbot) {
+    throw json({ error: "Chatbot not found" }, { status: 404 });
+  }
+
+  return json(chatbot);
+};
+
+export const action: ActionFunction = async ({ request, params }) => {
+  const session = await getKindeSession(request);
+  const user = await session.getUser();
+  if (!user) return json({ error: "Unauthorized" }, { status: 401 });
+
+  const ip = request.headers.get("x-forwarded-for") || "127.0.0.1";
+  const { success, remaining } = await rateLimiter.limit(ip);
+  if (!success) return json({ error: "Too many requests", remaining }, { status: 429 });
+
+  const formData = await request.formData();
+  const action = formData.get("action") as string;
+
+  switch (action) {
+    case "sendMessage": {
+      const conversationId = formData.get("conversationId") as string;
+      const message = formData.get("message") as string;
+
+      if (!conversationId || !message) {
+        return json({ error: "Missing conversationId or message" }, { status: 400 });
+      }
+
+      // Verify conversation exists and belongs to the chatbot
+      const conversation = await prisma.conversation.findFirst({
+        where: { id: conversationId, chatbotId: params.id },
+        include: { messages: true },
+      });
+
+      if (!conversation) {
+        return json({ error: "Conversation not found" }, { status: 404 });
+      }
+
+      const userMessage = await prisma.message.create({
+        data: { conversationId, content: message, role: "user" },
+      });
+
+      const response = await generateResponse(
+        message,
+        conversation.messages.map((m: { role: any; content: any; }) => `${m.role}: ${m.content}`).join("\n")
+      );
+      const aiMessage = await prisma.message.create({
+        data: { conversationId, content: response(), role: "assistant" },
+      });
+
+      return json({ userMessage, aiMessage });
+    }
+    default:
+      return json({ error: "Invalid action" }, { status: 400 });
+  }
+};// app/routes/chatbot.$id.customize.tsx
+import { useState } from "react";
+import { Form, useLoaderData, useNavigation, useActionData } from "@remix-run/react";
+import { LoaderFunctionArgs, redirect, json, ActionFunction } from "@remix-run/node";
+import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
+import prisma from "~/utils/prisma.server";
+import { Trash2 } from "lucide-react";
+import { ChatPreview } from "~/components/chatPreview";
+import { Prisma } from "@prisma/client";
+
+// Type definitions
+interface QuickReply {
+  text: string;
+  action: string;
+}
+
+interface ChatSettings {
+  id: string;
+  chatbotId: string;
+  brandColor: string;
+  chatBackground: string;
+  chatOpacity: number;
+  chatBorderRadius: number;
+  customLogo: string | null;
+  chatWidth: number;
+  chatHeight: number;
+  showEmailCapture: boolean;
+  emailPlaceholder: string;
+  quickReplies: QuickReply[];
+  userBubbleColor: string;
+  aiBubbleColor: string;
+  headingColor: string;
+}
+
+interface LoaderData {
+  chatbot: {
+    id: string;
+    name: string;
+    conversations: Array<{
+      messages: Array<{
+        content: string;
+        isUser: boolean;
+        createdAt: string;
+      }>;
+    }>;
+  };
+  settings: ChatSettings;
+}
+
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+  const { isAuthenticated } = await getKindeSession(request);
+  if (!(await isAuthenticated())) throw redirect("/login");
+
+  const user = await (await getKindeSession(request)).getUser();
+  if (!user) throw json({ error: "User not found" }, { status: 401 });
+
+  const chatbot = await prisma.chatbot.findFirst({
+    where: { id: params.id, userId: user.id },
+    include: { 
+      settings: true,
+      conversations: {
+        include: { messages: true }, // Include messages in each conversation
+        take: 1,
+        orderBy: { createdAt: 'asc' }
+      }
+    },
+  });
+
+  if (!chatbot) throw json({ error: "Chatbot not found" }, { status: 404 });
+
+  const conversations = chatbot.conversations.map(convo => ({
+    messages: convo.messages.map(msg => ({
+      content: msg.content,
+      isUser: msg.role === "user", // Map role to isUser
+      createdAt: msg.createdAt.toISOString(), // convert Date to string
+    }))
+  }));
+  
+
+  // Default settings with proper type assertion
+  const settings: ChatSettings = chatbot.settings ? {
+    ...(chatbot.settings as unknown as ChatSettings),
+    quickReplies: chatbot.settings.quickReplies as unknown as QuickReply[] || []
+  } : {
+    id: '',
+    chatbotId: params.id!,
+    brandColor: "#2563eb",
+    chatBackground: "#ffffff",
+    chatOpacity: 1.0,
+    chatBorderRadius: 8,
+    customLogo: null,
+    chatWidth: 300,
+    chatHeight: 400,
+    showEmailCapture: false,
+    emailPlaceholder: "Enter your email",
+    quickReplies: [],
+    userBubbleColor: "#e0e0e0",
+    aiBubbleColor: "#2563eb",
+    headingColor: "#000000"
+  };
+
+  return json<LoaderData>({ 
+    chatbot: {
+      id: chatbot.id,
+      name: chatbot.name,
+      conversations
+    },
+    settings
+  });
+};
+
+
+// Define a type for the settings update data that matches what Prisma expects
+type ChatSettingsUpdateInput = Omit<ChatSettings, "id" | "chatbotId" | "quickReplies"> & {
+  quickReplies: Prisma.JsonValue;
+};
+
+export const action: ActionFunction = async ({ request, params }) => {
+  const { isAuthenticated } = await getKindeSession(request);
+  if (!(await isAuthenticated()))
+    return json({ error: "Unauthorized" }, { status: 401 });
+
+  const formData = await request.formData();
+  
+  const settingsData: ChatSettingsUpdateInput = {
+    brandColor: formData.get("brandColor") as string,
+    chatBackground: formData.get("chatBackground") as string,
+    chatOpacity: Number(formData.get("chatOpacity")),
+    chatBorderRadius: Number(formData.get("chatBorderRadius")),
+    customLogo: (formData.get("customLogo") as string) || null,
+    chatWidth: Number(formData.get("chatWidth")),
+    chatHeight: Number(formData.get("chatHeight")),
+    showEmailCapture: formData.get("showEmailCapture") === "true",
+    emailPlaceholder: formData.get("emailPlaceholder") as string,
+    // Parse the quickReplies value and cast it to Prisma.JsonValue
+    quickReplies: JSON.parse(formData.get("quickReplies") as string) as unknown as Prisma.JsonValue,
+    userBubbleColor: formData.get("userBubbleColor") as string,
+    aiBubbleColor: formData.get("aiBubbleColor") as string,
+    headingColor: formData.get("headingColor") as string,
+  };
+
+  try {
+    await prisma.chatSettings.upsert({
+      where: { chatbotId: params.id },
+      create: {
+        chatbotId: params.id!,
+        ...settingsData,
+      },
+      update: settingsData,
+    });
+    
+    return json({ success: true });
+  } catch (error) {
+    console.error("Error updating settings:", error);
+    return json({ error: "Failed to update settings" }, { status: 500 });
+  }
+};
+
+export default function CustomizeChatbot() {
+  const { chatbot, settings } = useLoaderData<typeof loader>();
+  const actionData = useActionData<typeof action>();
+  const navigation = useNavigation();
+  const isSubmitting = navigation.state === "submitting";
+
+  // State initialization with proper types
+  const [brandColor, setBrandColor] = useState(settings.brandColor);
+  const [chatBackground, setChatBackground] = useState(settings.chatBackground);
+  const [chatOpacity, setChatOpacity] = useState(settings.chatOpacity);
+  const [chatBorderRadius, setChatBorderRadius] = useState(settings.chatBorderRadius);
+  const [customLogo, setCustomLogo] = useState(settings.customLogo);
+  const [chatWidth, setChatWidth] = useState(settings.chatWidth);
+  const [chatHeight, setChatHeight] = useState(settings.chatHeight);
+  const [showEmailCapture, setShowEmailCapture] = useState(settings.showEmailCapture);
+  const [emailPlaceholder, setEmailPlaceholder] = useState(settings.emailPlaceholder);
+  const [quickReplies, setQuickReplies] = useState<QuickReply[]>(settings.quickReplies);
+  const [userBubbleColor, setUserBubbleColor] = useState(settings.userBubbleColor);
+  const [aiBubbleColor, setAiBubbleColor] = useState(settings.aiBubbleColor);
+  const [headingColor, setHeadingColor] = useState(settings.headingColor);
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => setCustomLogo(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const addQuickReply = () => {
+    setQuickReplies([...quickReplies, { text: "", action: "" }]);
+  };
+
+  const removeQuickReply = (index: number) => {
+    setQuickReplies(quickReplies.filter((_, i) => i !== index));
+  };
+
+  const handleQuickReplyChange = (index: number, field: keyof QuickReply, value: string) => {
+    const newReplies = [...quickReplies];
+    newReplies[index] = { ...newReplies[index], [field]: value };
+    setQuickReplies(newReplies);
+  };
+
+  const defaultMessage = { 
+    content: "Hello! How can I help you today?", 
+    isUser: false, 
+    createdAt: new Date().toISOString() 
+  };
+  
+  const previewMessages = chatbot.conversations[0]?.messages || [defaultMessage];
+
+  return (
+    <div className="min-h-screen bg-base-100 p-4 md:p-8">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-3xl font-bold mb-6">Customize Chatbot: {chatbot.name}</h1>
+        
+        {actionData?.success && (
+          <div className="alert alert-success mb-4">Settings saved successfully!</div>
+        )}
+        {actionData?.error && (
+          <div className="alert alert-error mb-4">{actionData.error}</div>
+        )}
+
+        <Form method="post" className="space-y-6">
+          {/* Hidden inputs for form data */}
+          <input type="hidden" name="brandColor" value={brandColor} />
+          <input type="hidden" name="chatBackground" value={chatBackground} />
+          <input type="hidden" name="chatOpacity" value={chatOpacity.toString()} />
+          <input type="hidden" name="chatBorderRadius" value={chatBorderRadius.toString()} />
+          <input type="hidden" name="customLogo" value={customLogo || ""} />
+          <input type="hidden" name="chatWidth" value={chatWidth.toString()} />
+          <input type="hidden" name="chatHeight" value={chatHeight.toString()} />
+          <input type="hidden" name="showEmailCapture" value={showEmailCapture.toString()} />
+          <input type="hidden" name="emailPlaceholder" value={emailPlaceholder} />
+          <input type="hidden" name="quickReplies" value={JSON.stringify(quickReplies)} />
+          <input type="hidden" name="userBubbleColor" value={userBubbleColor} />
+          <input type="hidden" name="aiBubbleColor" value={aiBubbleColor} />
+          <input type="hidden" name="headingColor" value={headingColor} />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Brand Customization Section */}
+            <div className="card bg-base-100 p-6 shadow-sm">
+              <h2 className="text-xl font-semibold mb-4">Brand Customization</h2>
+              
+              <div className="form-control">
+                <label className="label">
+                  <span className="label-text">Brand Color</span>
+                </label>
+                <input
+                  type="color"
+                  value={brandColor}
+                  onChange={(e) => setBrandColor(e.target.value)}
+                  className="w-20 h-12 cursor-pointer rounded-lg"
+                />
+              </div>
+
+              <div className="form-control mt-4">
+                <label className="label">
+                  <span className="label-text">Upload Logo</span>
+                </label>
+                <div className="flex items-center gap-4">
+                  {customLogo && (
+                    <img
+                      src={customLogo}
+                      className="w-16 h-16 rounded-lg object-contain border border-base-300"
+                      alt="Custom logo"
+                    />
+                  )}
+                  <label className="btn btn-outline btn-sm cursor-pointer">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleLogoChange}
+                    />
+                    {customLogo ? "Change Logo" : "Upload Logo"}
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Chat Appearance Section */}
+            <div className="card bg-base-100 p-6 shadow-sm">
+              <h2 className="text-xl font-semibold mb-4">Chat Appearance</h2>
+              
+              <div className="space-y-4">
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">Chat Background</span>
+                  </label>
+                  <input
+                    type="color"
+                    value={chatBackground}
+                    onChange={(e) => setChatBackground(e.target.value)}
+                    className="w-20 h-12 cursor-pointer rounded-lg"
+                  />
+                </div>
+
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">User Bubble Color</span>
+                  </label>
+                  <input
+                    type="color"
+                    value={userBubbleColor}
+                    onChange={(e) => setUserBubbleColor(e.target.value)}
+                    className="w-20 h-12 cursor-pointer rounded-lg"
+                  />
+                </div>
+
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">AI Bubble Color</span>
+                  </label>
+                  <input
+                    type="color"
+                    value={aiBubbleColor}
+                    onChange={(e) => setAiBubbleColor(e.target.value)}
+                    className="w-20 h-12 cursor-pointer rounded-lg"
+                  />
+                </div>
+
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">Heading Color</span>
+                  </label>
+                  <input
+                    type="color"
+                    value={headingColor}
+                    onChange={(e) => setHeadingColor(e.target.value)}
+                    className="w-20 h-12 cursor-pointer rounded-lg"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Dimensions & Style Section */}
+            <div className="card bg-base-100 p-6 shadow-sm">
+              <h2 className="text-xl font-semibold mb-4">Dimensions & Style</h2>
+              
+              <div className="space-y-4">
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">Width (px)</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={chatWidth}
+                    onChange={(e) => setChatWidth(Number(e.target.value))}
+                    className="input input-bordered"
+                    min="200"
+                    max="800"
+                  />
+                </div>
+
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">Height (px)</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={chatHeight}
+                    onChange={(e) => setChatHeight(Number(e.target.value))}
+                    className="input input-bordered"
+                    min="200"
+                    max="800"
+                  />
+                </div>
+
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">Border Radius (px)</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={chatBorderRadius}
+                    onChange={(e) => setChatBorderRadius(Number(e.target.value))}
+                    className="input input-bordered"
+                    min="0"
+                    max="50"
+                  />
+                </div>
+
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">Opacity</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={chatOpacity}
+                    onChange={(e) => setChatOpacity(Number(e.target.value))}
+                    className="input input-bordered"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Replies Section */}
+            <div className="card bg-base-100 p-6 shadow-sm">
+              <h2 className="text-xl font-semibold mb-4">Quick Replies</h2>
+              
+              <div className="space-y-3">
+                {quickReplies.map((reply, index) => (
+                  <div key={index} className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      value={reply.text}
+                      onChange={(e) => handleQuickReplyChange(index, 'text', e.target.value)}
+                      className="input input-bordered flex-1"
+                      placeholder="Button text"
+                    />
+                    <input
+                      type="text"
+                      value={reply.action}
+                      onChange={(e) => handleQuickReplyChange(index, 'action', e.target.value)}
+                      className="input input-bordered w-1/3"
+                      placeholder="Action"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeQuickReply(index)}
+                      className="btn btn-square btn-sm btn-error"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+                
+                <button
+                  type="button"
+                  onClick={addQuickReply}
+                  className="btn btn-primary btn-sm mt-2"
+                >
+                  Add Quick Reply
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Preview Section */}
+          <div className="card bg-base-100 p-6 shadow-sm mt-6">
+            <h2 className="text-xl font-semibold mb-4">Live Preview</h2>
+            // In chatToggler.tsx
+<ChatPreview 
+  settings={{
+    chatWidth: 400,  // Add default value
+    chatHeight: 600, // Add default value
+    chatBackground: '#ffffff',
+    chatOpacity: 1,
+    chatBorderRadius: 8,
+    brandColor: '#2563eb',
+    customLogo: undefined,
+    showEmailCapture: false,
+    emailPlaceholder: '',
+    quickReplies: [],
+    userBubbleColor: '#e0e0e0', // Add missing property
+    aiBubbleColor: '#2563eb',    // Add missing property
+    headingColor: '#000000'
+  }}
+  messages={[]}
+  onSendMessage={() => {}}
+/>
+          </div>
+
+          {/* Submit Button */}
+          <div className="flex justify-end mt-6">
+            <button
+              type="submit"
+              className="btn btn-primary gap-2"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Saving..." : "Save Changes"}
+              {isSubmitting && (
+                <span className="loading loading-spinner loading-sm"></span>
+              )}
+            </button>
+          </div>
+        </Form>
+      </div>
+    </div>
+  );
+}// app/routes/_404.tsx
+import { Link, useRouteError } from "@remix-run/react";
+import type { ErrorResponse } from "@remix-run/node";
+
+const NotFound = () => {
+  const error = useRouteError() as ErrorResponse;
+  console.error(error); // Log the error for debugging. Important!
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 flex items-center justify-center p-4">
+      <div className="max-w-md w-full text-center space-y-8">
+        <div className="relative">
+          <h1 className="text-9xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">
+            404
+          </h1>
+          <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-full">
+            <div className="w-32 h-32 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-full blur-3xl mx-auto animate-float" />
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <h2 className="text-2xl font-bold text-white">Page Not Found</h2>
+          <p className="text-gray-400">
+            The page you're looking for doesn't exist or has been moved.
+          </p>
+          
+          {/* Conditionally display error details in development */}
+          {import.meta.env.DEV && (
+            <pre className="bg-gray-700 text-white p-4 rounded mt-4"> {/* Added some styling */}
+              {error.data || "No error message available"}
+            </pre>
+          )}
+
+          <Link
+            to="/"
+            className="inline-block px-6 py-3 text-sm font-medium text-white bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200 shadow-lg hover:shadow-purple-500/25"
+          >
+            Return Home
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default NotFound;
+
+import { Check } from "lucide-react";
+import { Link } from "@remix-run/react";
+import { Navbar } from "../components/layout/navbar";
+
+const PricingTier = ({
+  name,
+  price,
+  features,
+  isPopular,
+}: {
+  name: string;
+  price: string;
+  features: string[];
+  isPopular?: boolean;
+}) => (
+  <div className={`relative p-6 bg-gray-900 rounded-2xl border ${isPopular ? 'border-purple-500' : 'border-gray-800'} backdrop-blur-xl`}>
+    {isPopular && (
+      <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 text-sm font-medium text-white bg-gradient-to-r from-purple-500 to-pink-500 rounded-full">
+        Most Popular
+      </span>
+    )}
+    <div className="text-center">
+      <h3 className="text-xl font-semibold text-white">{name}</h3>
+      <div className="mt-4 flex items-baseline justify-center">
+        <span className="text-4xl font-bold text-white">{price}</span>
+        <span className="ml-1 text-gray-400">/month</span>
+      </div>
+    </div>
+    <ul className="mt-6 space-y-4">
+      {features.map((feature, index) => (
+        <li key={index} className="flex items-center text-gray-300">
+          <Check className="h-5 w-5 text-purple-500 mr-2" />
+          {feature}
+        </li>
+      ))}
+    </ul>
+    <Link
+      to="/register"
+      className={`mt-8 block w-full px-6 py-3 text-center text-sm font-medium rounded-lg ${
+        isPopular
+          ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600'
+          : 'bg-gray-800 text-white hover:bg-gray-700'
+      } transition-all duration-200`}
+    >
+      Get Started
+    </Link>
+  </div>
+);
+
+const Pricing = () => {
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800">
+     
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+        <div className="text-center max-w-3xl mx-auto mb-16">
+          <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600 mb-4">
+            Simple, Transparent Pricing
+          </h1>
+          <p className="text-xl text-gray-400">
+            Choose the perfect plan for your chatbot needs
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-8 max-w-7xl mx-auto">
+          <PricingTier
+            name="Starter"
+            price="$29"
+            features={[
+              "1 Chatbot",
+              "Basic Analytics",
+              "Standard Templates",
+              "Email Support",
+              "5,000 Messages/mo",
+            ]}
+          />
+          <PricingTier
+            name="Professional"
+            price="$79"
+            features={[
+              "3 Chatbots",
+              "Advanced Analytics",
+              "Custom Templates",
+              "Priority Support",
+              "25,000 Messages/mo",
+            ]}
+            isPopular
+          />
+          <PricingTier
+            name="Enterprise"
+            price="$199"
+            features={[
+              "Unlimited Chatbots",
+              "Custom Analytics",
+              "Custom Integration",
+              "24/7 Support",
+              "Unlimited Messages",
+            ]}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Pricing;// app/routes/chatbot.new.tsx
+import { useState } from "react";
+import { Form, useNavigation, redirect, useActionData } from "@remix-run/react";
+import { LoaderFunctionArgs, json, ActionFunction } from "@remix-run/node";
+import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
+import prisma from "~/utils/prisma.server";
+import { v4 as uuidv4 } from "uuid";
+import { ChatPreview } from "~/components/chatPreview";
+import { Trash2 } from "lucide-react";
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const { isAuthenticated } = await getKindeSession(request);
+  if (!(await isAuthenticated())) throw redirect("/login");
+  return json({});
+};
+
+export const action: ActionFunction = async ({ request }) => {
+  const session = await getKindeSession(request);
+  const user = await session.getUser();
+  if (!user) return json({ error: "Unauthorized" }, { status: 401 });
+
+  const formData = await request.formData();
+  const name = formData.get("name") as string;
+  const brandColor = formData.get("brandColor") as string || "#2563eb";
+  const initialMessage = formData.get("initialMessage") as string || "Hello! How can I help you today?";
+  const customLogo = formData.get("customLogo") as string | null;
+  const quickRepliesRaw = formData.get("quickReplies") as string;
+  const quickReplies: { text: string; action: string }[] = quickRepliesRaw ? JSON.parse(quickRepliesRaw) : [];
+
+  if (!name) return json({ error: "Name is required" }, { status: 400 });
+
+  try {
+    await prisma.user.upsert({
+      where: { kindeId: user.id },
+      create: { kindeId: user.id, email: user.email!, name: user.given_name || user.email || "Unnamed User" },
+      update: { email: user.email!, name: user.given_name || user.email || "Unnamed User" },
+    });
+
+    const chatbot = await prisma.chatbot.create({
+      data: {
+        name,
+        connectionString: `chtbt_${uuidv4().replace(/-/g, "")}`,
+        userId: user.id,
+        settings: {
+          create: {
+            brandColor,
+            customLogo: customLogo || null,
+            chatBackground: "#ffffff",
+            chatOpacity: 1.0,
+            chatBorderRadius: 8,
+            chatWidth: 300,
+            chatHeight: 400,
+            showEmailCapture: false,
+            emailPlaceholder: "Enter your email",
+            quickReplies,
+            userBubbleColor: "#e0e0e0",
+            aiBubbleColor: "#2563eb",
+            headingColor: "#000000",
+          },
+        },
+        conversations: {
+          create: [{ messages: { create: [{ content: initialMessage, role: "system" }] } }],
+        },
+      },
+    });
+
+    return redirect("/dashboard");
+  } catch (error) {
+    console.error("Error creating chatbot:", error);
+    return json({ error: "Failed to create chatbot. Check server logs." }, { status: 500 });
+  }
+};
+
+export default function NewChatbot() {
+  const navigation = useNavigation();
+  const actionData = useActionData<typeof action>();
+  const isSubmitting = navigation.state === "submitting";
+  const [brandColor, setBrandColor] = useState("#2563eb");
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [initialMessage, setInitialMessage] = useState("Hello! How can I help you today?");
+  const [quickReplies, setQuickReplies] = useState<{ text: string; action: string }[]>([]);
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => setLogoPreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const addQuickReply = () => setQuickReplies([...quickReplies, { text: "", action: "" }]);
+  const removeQuickReply = (index: number) => setQuickReplies(quickReplies.filter((_, i) => i !== index));
+  const handleQuickReplyChange = (index: number, field: "text" | "action", value: string) => {
+    const newReplies = [...quickReplies];
+    newReplies[index][field] = value;
+    setQuickReplies(newReplies);
+  };
+
+  const handleSubmit = () => {
+    if (!actionData?.error) {
+      setName("");
+      setBrandColor("#2563eb");
+      setLogoPreview(null);
+      setInitialMessage("Hello! How can I help you today?");
+      setQuickReplies([]);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-base-100 p-4 md:p-8">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-3xl font-bold mb-8">Create New Chatbot</h1>
+        {actionData?.error && <div className="alert alert-error mb-4">{actionData.error}</div>}
+        <Form method="post" className="space-y-6" encType="multipart/form-data" onSubmit={handleSubmit}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="card bg-base-100 p-6 shadow-sm">
+              <h2 className="text-xl font-semibold mb-4">Basic Information</h2>
+              <div className="form-control">
+                <label className="label"><span className="label-text">Chatbot Name</span></label>
+                <input
+                  type="text"
+                  name="name"
+                  placeholder="My Awesome Chatbot"
+                  className="input input-bordered"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-control mt-4">
+                <label className="label"><span className="label-text">Brand Color</span></label>
+                <input
+                  type="color"
+                  name="brandColor"
+                  value={brandColor}
+                  onChange={(e) => setBrandColor(e.target.value)}
+                  className="w-20 h-12 cursor-pointer"
+                />
+              </div>
+              <div className="form-control mt-4">
+                <label className="label"><span className="label-text">Upload Logo</span></label>
+                <div className="flex items-center gap-4">
+                  {logoPreview && <img src={logoPreview} className="w-16 h-16 rounded-lg object-contain" />}
+                  <label className="btn btn-outline btn-sm cursor-pointer">
+                    <input type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
+                    {logoPreview ? "Change Logo" : "Upload Logo"}
+                  </label>
+                </div>
+                <input type="hidden" name="customLogo" value={logoPreview || ""} />
+              </div>
+            </div>
+
+            <div className="card bg-base-100 p-6 shadow-sm">
+              <h2 className="text-xl font-semibold mb-4">Initial Configuration</h2>
+              <div className="form-control">
+                <label className="label"><span className="label-text">Welcome Message</span></label>
+                <textarea
+                  name="initialMessage"
+                  className="textarea textarea-bordered h-32"
+                  placeholder="Enter initial greeting message..."
+                  value={initialMessage}
+                  onChange={(e) => setInitialMessage(e.target.value)}
+                />
+              </div>
+              <div className="form-control mt-4">
+                <h3 className="text-lg font-semibold mb-2">Quick Replies</h3>
+                {quickReplies.map((reply, index) => (
+                  <div key={index} className="flex gap-2 items-center mb-2">
+                    <input
+                      type="text"
+                      value={reply.text}
+                      onChange={(e) => handleQuickReplyChange(index, "text", e.target.value)}
+                      className="input input-bordered flex-1"
+                      placeholder="Button text"
+                    />
+                    <input
+                      type="text"
+                      value={reply.action}
+                      onChange={(e) => handleQuickReplyChange(index, "action", e.target.value)}
+                      className="input input-bordered w-1/3"
+                      placeholder="Action (optional)"
+                    />
+                    <button type="button" onClick={() => removeQuickReply(index)} className="btn btn-square btn-sm btn-error">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+                <button type="button" onClick={addQuickReply} className="btn btn-primary btn-sm mt-2">
+                  Add Quick Reply
+                </button>
+                <input type="hidden" name="quickReplies" value={JSON.stringify(quickReplies)} />
+              </div>
+            </div>
+          </div>
+
+          <div className="card bg-base-100 p-6 shadow-sm">
+            <h2 className="text-xl font-semibold mb-4">Preview</h2>
+            <ChatPreview
+              messages={[{ content: initialMessage, isUser: false, createdAt: new Date().toISOString() }]}
+              onSendMessage={() => {}}
+              settings={{
+                chatWidth: 300,
+                chatHeight: 400,
+                chatBackground: "#ffffff",
+                chatOpacity: 1.0,
+                chatBorderRadius: 8,
+                brandColor,
+                customLogo: logoPreview || null,
+                showEmailCapture: false,
+                emailPlaceholder: "Enter your email",
+                quickReplies,
+                userBubbleColor: "#e0e0e0",
+                aiBubbleColor: "#2563eb",
+                headingColor: "#000000",
+                capturedEmail: "",
+                onEmailCapture: () => {},
+              }}
+            />
+          </div>
+
+          <div className="flex justify-end gap-4">
+            <button type="submit" className="btn btn-primary gap-2" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <span className="loading loading-spinner"></span>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 11h-6V5h-2v6H5v2h6v6h2v-6h6z" />
+                </svg>
+              )}
+              Create Chatbot
+            </button>
+          </div>
+        </Form>
+      </div>
+    </div>
+  );
+}import React from "react";
+import ReactMarkdown from "react-markdown";
+
+const DocumentationPage = () => {
+  const md = `
+# Custom Chatbot Documentation
+
+## Overview
+This guide provides instructions for integrating and customizing our chatbot.
+
+## Installation
+\`\`\`bash
+npm install custom-chatbot
+\`\`\`
+
+## JavaScript Integration
+\`\`\`javascript
+import { CustomChatbot } from 'custom-chatbot';
+
+const bot = new CustomChatbot({
+  botName: 'SupportBot',
+  apiUrl: 'https://api.yourdomain.com',
+  options: {
+    brandColor: '#10B981',
+    togglerSize: 56,
+    initialMessage: 'Welcome! How can I assist you?'
+  }
+});
+
+bot.init();
+\`\`\`
+
+## React Integration
+\`\`\`jsx
+import { CustomChatWidget } from 'custom-chatbot';
+
+const App = () => (
+  <CustomChatWidget
+    botName="SupportBot"
+    apiUrl="https://api.yourdomain.com"
+    brandColor="#10B981"
+    togglerSize={56}
+    quickReplies={[{ text: 'Help', action: 'showHelp' }]}
+  />
+);
+\`\`\`
+
+## API Endpoints
+| Method | Endpoint               | Description                          |
+|--------|------------------------|--------------------------------------|
+| GET    | /api/chatbots          | List all chatbots                   |
+| POST   | /api/chatbots          | Create a new chatbot                |
+| GET    | /api/chatbots/{id}     | Get chatbot details                 |
+| PUT    | /api/chatbots/{id}     | Update chatbot settings             |
+| DELETE | /api/chatbots/{id}     | Delete a chatbot                    |
+
+## Advanced Configuration
+- **Custom Styling:**
+  \`\`\`json
+  {
+    "chatWidth": 400,
+    "chatHeight": 600,
+    "fontFamily": "Arial"
+  }
+  \`\`\`
+- **Event Handlers:**
+  \`\`\`javascript
+  bot.on('message', (msg) => console.log('New message:', msg));
+  \`\`\`
+
+## Support
+Visit [Support Page](https://support.yourdomain.com) for help.
+  `;
+
+  return (
+    <div className="min-h-screen bg-base-200 text-base-content p-8">
+      <div className="max-w-4xl mx-auto">
+        <div className="prose prose-headings:text-primary prose-a:text-secondary">
+          <ReactMarkdown
+            components={{
+              h1: ({ children }) => <h1 className="text-4xl font-bold my-6">{children}</h1>,
+              h2: ({ children }) => <h2 className="text-3xl font-semibold my-5">{children}</h2>,
+              h3: ({ children }) => <h3 className="text-2xl font-medium my-4">{children}</h3>,
+              p: ({ children }) => <p className="my-3">{children}</p>,
+              ul: ({ children }) => <ul className="list-disc pl-5 my-3">{children}</ul>,
+              ol: ({ children }) => <ol className="list-decimal pl-5 my-3">{children}</ol>,
+              a: ({ children, href }) => (
+                <a className="text-secondary hover:underline" href={href}>
+                  {children}
+                </a>
+              ),
+              table: ({ children }) => (
+                <div className="overflow-x-auto">
+                  <table className="table w-full">{children}</table>
+                </div>
+              ),
+              tr: ({ children }) => <tr className="border-b border-base-300">{children}</tr>,
+              th: ({ children }) => <th className="py-2 px-4 text-left">{children}</th>,
+              td: ({ children }) => <td className="py-2 px-4">{children}</td>,
+              code({ node, inline, className, children, ...props }) {
+                return (
+                  <pre className="bg-neutral p-4 rounded-lg overflow-x-auto">
+                    <code className="text-neutral-content">{children}</code>
+                  </pre>
+                );
+              },
+            }}
+          >
+            {md}
+          </ReactMarkdown>
+        </div>
+        <div className="mt-8 flex space-x-4">
+          <button className="btn btn-primary" onClick={() => {}}>
+            Get Started
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default DocumentationPage;// app/routes/chatbot.$id.tsx
+import { json, redirect } from "@remix-run/node";
+import type { ActionFunction, LoaderFunction } from "@remix-run/node";
+import { useLoaderData, Form, useActionData, useNavigation } from "@remix-run/react";
+import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
+import prisma from "~/utils/prisma.server";
+import { ChatPreview } from "~/components/chatPreview";
+import { useState } from "react";
+import { Trash2 } from "lucide-react";
+
+// LangChain and Astra DB imports
+import { AstraDBVectorStore } from "@langchain/community/vectorstores/astradb";
+import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
+import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { RunnableSequence } from "@langchain/core/runnables";
+import { StringOutputParser } from "@langchain/core/output_parsers";
+import { PromptTemplate } from "@langchain/core/prompts";
+import { TaskType } from "@google/generative-ai";
+
+// Read configuration from environment variables
+const token = process.env.ASTRA_DB_APPLICATION_TOKEN!;
+const endpoint = process.env.ASTRA_DB_ENDPOINT!;
+const collection = process.env.ASTRA_DB_COLLECTION!;
+
+const embeddings = new GoogleGenerativeAIEmbeddings({
+  modelName: "text-embedding-004", // 768 dimensions
+  taskType: TaskType.RETRIEVAL_DOCUMENT,
+  title: "Document title",
+});
+
+const llm = new ChatGoogleGenerativeAI({
+  apiKey: process.env.GEMINI_API_KEY!,
+  model: "gemini-1.5-pro",
+  temperature: 0,
+  maxRetries: 2,
+});
+
+export const loader: LoaderFunction = async ({ request, params }) => {
+  const session = await getKindeSession(request);
+  const user = await session.getUser();
+  if (!user) return json({ error: "Unauthorized" }, { status: 401 });
+
+  const chatbot = await prisma.chatbot.findFirst({
+    where: { id: params.id, userId: user.id },
+    include: { 
+      settings: true, 
+      conversations: { include: { messages: true } } 
+    },
+  });
+
+  if (!chatbot) return json({ error: "Chatbot not found" }, { status: 404 });
+
+  const messageCount = await prisma.message.count({
+    where: { conversation: { chatbotId: params.id, chatbot: { userId: user.id } } },
+  });
+
+  return json({ chatbot, messageCount });
+};
+
+export const action: ActionFunction = async ({ request, params }) => {
+  const session = await getKindeSession(request);
+  const user = await session.getUser();
+  if (!user) return json({ error: "Unauthorized" }, { status: 401 });
+
+  const messageCount = await prisma.message.count({
+    where: { conversation: { chatbotId: params.id, chatbot: { userId: user.id } } },
+  });
+
+  if (messageCount >= 10) {
+    return redirect("/payment");
+  }
+
+  const formData = await request.formData();
+  const actionType = formData.get("action");
+
+  switch (actionType) {
+    case "sendMessage": {
+      const message = formData.get("message") as string;
+      const conversationId = formData.get("conversationId") as string;
+
+      const conversation = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        include: { messages: true },
+      });
+      if (!conversation)
+        return json({ error: "Conversation not found" }, { status: 404 });
+
+      // Save the user's message
+      const userMessage = await prisma.message.create({
+        data: { conversationId, content: message, role: "user" },
+      });
+
+      // --- RAG using LangChain and Astra DB ---
+      // Instantiate the vector store using the official fromExistingIndex method
+      const vectorStore = await AstraDBVectorStore.fromExistingIndex(embeddings, {
+        token,
+        endpoint,
+        collection,
+        collectionOptions: {
+          vector: {
+            dimension: 768,
+            metric: "cosine",
+          },
+        },
+      });
+
+      const retriever = vectorStore.asRetriever();
+      const docs = await retriever.getRelevantDocuments(message);
+      const context = docs.map((doc) => doc.pageContent).join("\n");
+
+      const prompt = PromptTemplate.fromTemplate(
+        "Answer based on the following context:\n{context}\n\nQuestion: {question}"
+      );
+
+      const chain = RunnableSequence.from([
+        prompt,
+        llm,
+        new StringOutputParser(),
+      ]);
+
+      const response = await chain.invoke({ context, question: message });
+
+      // Save the AI's response
+      const aiMessage = await prisma.message.create({
+        data: { conversationId, content: response, role: "assistant" },
+      });
+
+      return json({ userMessage, aiMessage });
+    }
+    default:
+      return json({ error: "Invalid action" }, { status: 400 });
+  }
+};
+
+export default function ChatbotPage() {
+  const { chatbot, messageCount } = useLoaderData<typeof loader>();
+  const actionData = useActionData<typeof action>();
+  const navigation = useNavigation();
+  const isSubmitting = navigation.state === "submitting";
+  const [message, setMessage] = useState("");
+  const [showPreview, setShowPreview] = useState(true);
+
+  if ("error" in chatbot) {
+    return (
+      <div className="min-h-screen bg-base-100 flex items-center justify-center">
+        <div className="alert alert-error">
+          <span>{chatbot.error}</span>
+        </div>
+      </div>
+    );
+  }
+
+  const handleSendMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!message.trim()) return;
+    setMessage("");
+  };
+
+  const codeSnippet = `
+    <div id="chatbot" style="width: ${chatbot.settings.chatWidth}px; height: ${chatbot.settings.chatHeight}px; background: ${chatbot.settings.chatBackground}; opacity: ${chatbot.settings.chatOpacity}; border-radius: ${chatbot.settings.chatBorderRadius}px;">
+      <div style="background: ${chatbot.settings.brandColor}; color: ${chatbot.settings.headingColor}; padding: 10px; border-radius: ${chatbot.settings.chatBorderRadius}px ${chatbot.settings.chatBorderRadius}px 0 0;">
+        ${chatbot.name}
+      </div>
+      <div style="padding: 10px;">
+        ${chatbot.conversations[0]?.messages.map((msg: { role: string; content: any; }) => `
+          <div style="background: ${msg.role === 'user' ? chatbot.settings.userBubbleColor : chatbot.settings.aiBubbleColor}; padding: 8px; margin: 4px 0; border-radius: 4px;">
+            ${msg.content}
+          </div>
+        `).join('')}
+      </div>
+      ${chatbot.settings.quickReplies.length > 0 ? `
+        <div style="padding: 10px;">
+          ${chatbot.settings.quickReplies.map((reply: { text: any; }) => `
+            <button style="background: ${chatbot.settings.brandColor}; color: white; padding: 6px 12px; margin: 4px; border-radius: 4px;">
+              ${reply.text}
+            </button>
+          `).join('')}
+        </div>
+      ` : ''}
+    </div>
+  `;
+
+  return (
+    <div className="min-h-screen bg-base-100 p-4 md:p-8">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-3xl font-bold mb-6">{chatbot.name}</h1>
+        <div className="flex justify-between items-center mb-4">
+          <button onClick={() => setShowPreview(!showPreview)} className="btn btn-outline">
+            {showPreview ? "Hide Preview" : "Show Preview"}
+          </button>
+          <span className="text-sm">Messages Used: {messageCount}/10</span>
+        </div>
+
+        {showPreview && (
+          <div className="card bg-base-100 shadow-sm mb-6">
+            <div className="card-body">
+              <h2 className="text-xl font-semibold mb-4">Chat Preview</h2>
+              <ChatPreview
+                messages={
+                  chatbot.conversations[0]?.messages.map((msg: { createdAt: any; }) => ({
+                    ...msg,
+                    createdAt: msg.createdAt || new Date().toISOString(),
+                  })) || []
+                }
+                onSendMessage={() => {}}
+                settings={chatbot.settings}
+                isLoading={isSubmitting}
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="card bg-base-100 shadow-sm mb-6">
+          <div className="card-body">
+            <h2 className="text-xl font-semibold mb-4">Send a Message</h2>
+            <Form method="post" onSubmit={handleSendMessage}>
+              <input type="hidden" name="action" value="sendMessage" />
+              <input type="hidden" name="conversationId" value={chatbot.conversations[0]?.id || ""} />
+              <div className="form-control">
+                <label className="label">
+                  <span className="label-text">Message</span>
+                </label>
+                <textarea
+                  name="message"
+                  className="textarea textarea-bordered"
+                  placeholder="Type your message..."
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  required
+                />
+              </div>
+              {actionData?.error && <div className="alert alert-error mt-4">{actionData.error}</div>}
+              <button type="submit" className="btn btn-primary mt-4" disabled={isSubmitting}>
+                {isSubmitting ? <span className="loading loading-spinner"></span> : "Send"}
+              </button>
+            </Form>
+            {actionData?.userMessage && actionData?.aiMessage && (
+              <div className="mt-4">
+                <p>
+                  <strong>You:</strong> {actionData.userMessage.content}{" "}
+                  <small>{new Date(actionData.userMessage.createdAt).toLocaleTimeString()}</small>
+                </p>
+                <p>
+                  <strong>AI:</strong> {actionData.aiMessage.content}{" "}
+                  <small>{new Date(actionData.aiMessage.createdAt).toLocaleTimeString()}</small>
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="card bg-base-100 shadow-sm">
+          <div className="card-body">
+            <h2 className="text-xl font-semibold mb-4">Embed Code</h2>
+            <pre className="bg-gray-900 text-white p-4 rounded-lg overflow-x-auto">
+              <code>{codeSnippet.trim()}</code>
+            </pre>
+            <button
+              onClick={() => navigator.clipboard.writeText(codeSnippet.trim())}
+              className="btn btn-outline mt-4"
+            >
+              Copy Code
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+import { useState } from "react";
+import { json, Link, redirect } from "@remix-run/react";
+import { toast } from "react-hot-toast";
+import { ArrowRight } from "lucide-react";
+import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
+import { LoaderFunctionArgs } from "@remix-run/node";
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const { isAuthenticated } = await getKindeSession(request);
+  if (await isAuthenticated()) throw redirect("/profile");
+  return json({});
+};
+
+function register({ authUrlParams }: { authUrlParams: { connection_id: string } }) {
+  // Construct the URL with the given connection_id for registration
+  const url = `/kinde-auth/register?connection_id=${authUrlParams.connection_id}`;
+  // Optionally show a toast message
+  toast("Redirecting to Google sign up...");
+  // Redirect to the Kinde authentication endpoint for registration
+  window.location.href = url;
+}
+
+const Register = () => {
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-background via-background/95 to-background/90 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+       {/* 3D Elements */}
+ <div className="hidden lg:block absolute inset-0 overflow-hidden">
+        <div className="parallax-layer absolute inset-0">
+          <div className="cube-1"></div>
+          <div className="cube-2"></div>
+          <div className="cube-3"></div>
+        </div>
+      </div> <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.1)_0,transparent_70%)]" />
+      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
+        <h2 className="text-center text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+          Join us!
+      
+        </h2>
+      </div>
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
+        <div className="glass-card py-8 px-4 shadow-2xl sm:rounded-2xl sm:px-10">
+          {/* Button to trigger Google registration */}
+          <button
+            onClick={() =>
+              register({
+                authUrlParams: {
+                  connection_id: "conn_0190c847b77996ef9532a4f639f1bd5a", // Use the same or different connection ID as needed
+                },
+              })
+            }
+            className="neo-brutalism w-full flex justify-center items-center gap-2 py-2 px-4 bg-primary text-slate-900 text-sm font-medium rounded-xl"
+          >
+            Sign up with Google <ArrowRight className="w-4 h-4" />
+          </button>
+          <div className="mt-6">
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 text-gray-400">
+                Already have an account?{" "}
+                <Link to="/login" className="font-medium text-primary hover:text-primary-hover">
+                  Sign in
+                </Link>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Register;// app/routes/checkout.tsx
+import { useState } from "react";
+import { Form } from "@remix-run/react";
+
+export default function Checkout() {
+  const [showMessage, setShowMessage] = useState(false);
+
+  const handlePay = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setShowMessage(true);
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="relative w-full h-full">
+        {/* Desktop Background */}
+        <div className="hidden lg:block absolute inset-0 overflow-hidden">
+          <div className="parallax-layer absolute inset-0">
+            <div className="cube-1"></div>
+            <div className="cube-2"></div>
+            <div className="cube-3"></div>
+          </div>
+        </div>
+
+        {/* Mobile Background */}
+        <div className="lg:hidden absolute inset-0 bg-blue-500"></div>
+
+        {/* Checkout Card */}
+        <div className="card w-full max-w-md bg-base-100 shadow-xl z-10">
+          <div className="card-body">
+            <h2 className="card-title text-3xl text-center mb-6">Checkout</h2>
+            <Form onSubmit={handlePay} className="form-control">
+              <div className="mb-4">
+                <label className="label">
+                  <span className="label-text">Name</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="John Doe"
+                  className="input input-bordered w-full"
+                  required
+                />
+              </div>
+              <div className="mb-4">
+                <label className="label">
+                  <span className="label-text">Email</span>
+                </label>
+                <input
+                  type="email"
+                  placeholder="john.doe@example.com"
+                  className="input input-bordered w-full"
+                  required
+                />
+              </div>
+              <div className="mb-4">
+                <label className="label">
+                  <span className="label-text">Card Number</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="1234 5678 9012 3456"
+                  className="input input-bordered w-full"
+                  required
+                />
+              </div>
+              <div className="mb-6 grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">
+                    <span className="label-text">Expiry Date</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="MM/YY"
+                    className="input input-bordered w-full"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="label">
+                    <span className="label-text">CVV</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="123"
+                    className="input input-bordered w-full"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="card-actions justify-center">
+                <button type="submit" className="btn btn-primary w-full">
+                  Pay
+                </button>
+              </div>
+            </Form>
+            {showMessage && (
+              <div className="mt-4 text-center">
+                <p className="text-xl font-bold text-green-600">
+                  Just kidding! This is a demo, no payment was processed. Your money is safe!
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}// app/routes/cpanel.tsx
+import { json, redirect, useLoaderData } from "@remix-run/react";
+import { Link } from "@remix-run/react";
+import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
+import { LoaderFunctionArgs } from "@remix-run/node";
+import prisma from "~/utils/prisma.server";
+import { Suspense, useState } from "react";
+import { Settings, BarChart2, Bot, User, LogOut } from "lucide-react";
+import { getUsage } from "~/utils/usage.server";
+import { Logger } from "~/utils/logger.server";
+import { generateEmbedCode } from "~/utils/embed.server"; // Server-only import stays in loader
+import { ChatSettings, EmbedCode } from "~/types/types";
+
+interface ChatbotWithEmbed {
+  id: string;
+  name: string;
+  connectionString: string;
+  createdAt: string;
+  settings: ChatSettings | null;
+  embed: EmbedCode; // Embed codes generated server-side
+}
+
+interface CpanelLoaderData {
+  user: { email: string; name: string | null; createdAt: string };
+  chatbots: ChatbotWithEmbed[];
+  analytics: {
+    total_messages: number;
+    total_conversations: number;
+    usage: { date: string; messages: number }[];
+  };
+  error?: string;
+}
+
+
+// app/routes/cpanel.tsx (loader only)
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  try {
+    const session = await getKindeSession(request);
+    const userFromSession = await session.getUser();
+    if (!userFromSession?.email) throw redirect("/login");
+
+    const user = await prisma.user.findUnique({ where: { email: userFromSession.email } });
+    if (!user) throw redirect("/register");
+
+    const chatbotsRaw = await prisma.chatbot.findMany({
+      where: { userId: user.id },
+      include: { settings: true },
+    });
+
+    const chatbots: ChatbotWithEmbed[] = chatbotsRaw.map((c) => {
+      const settings = c.settings
+        ? {
+            ...c.settings,
+            quickReplies: Array.isArray(c.settings.quickReplies) ? c.settings.quickReplies : [],
+          }
+        : null;
+      const embed = settings
+        ? generateEmbedCode(settings, c.connectionString)
+        : { react: "No settings", vanillaJs: "No settings" };
+      return {
+        id: c.id,
+        name: c.name,
+        connectionString: c.connectionString,
+        createdAt: new Date(c.createdAt).toISOString(),
+        settings,
+        embed,
+      };
+    });
+
+    let analytics = {
+      total_messages: 0,
+      total_conversations: 0,
+      usage: [] as { date: string; messages: number }[],
+    };
+    if (chatbots.length > 0) {
+      const chatbotIds = chatbots.map((c) => c.id);
+      const totalMessages = await prisma.message.count({
+        where: { conversation: { chatbotId: { in: chatbotIds } } },
+      });
+      const totalConversations = await prisma.conversation.count({
+        where: { chatbotId: { in: chatbotIds } },
+      });
+      const usage = await Promise.all(chatbots.map((c) => getUsage(c.id)));
+      analytics = {
+        total_messages: totalMessages,
+        total_conversations: totalConversations,
+        usage: usage.flat(),
+      };
+    }
+
+    Logger.info("Cpanel loaded", { userId: user.id });
+    return json<CpanelLoaderData>({
+      user: { email: user.email, name: user.name, createdAt: new Date(user.createdAt).toISOString() },
+      chatbots,
+      analytics,
+    });
+  } catch (error) {
+    Logger.error("Cpanel loader error", { error });
+    return json<CpanelLoaderData>(
+      {
+        user: { email: "", name: null, createdAt: "" },
+        chatbots: [],
+        analytics: { total_messages: 0, total_conversations: 0, usage: [] },
+        error: "Failed to load control panel",
+      },
+      { status: 500 }
+    );
+  }
+};
+const Cpanel = () => {
+  const data = useLoaderData<CpanelLoaderData>();
+  const [activeSection, setActiveSection] = useState<"overview" | "chatbots" | "settings">("overview");
+
+  if (data.error) return <div className="p-4 text-red-500">{data.error}</div>;
+
+  const { user, chatbots, analytics } = data;
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-background via-background/95 to-background/90">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 flex flex-col md:flex-row gap-8">
+        {/* Sidebar */}
+        <div className="md:w-1/4 glass-card p-6 rounded-2xl shadow-xl">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="avatar placeholder">
+              <div className="bg-neutral text-neutral-content rounded-full w-12">
+                <span className="text-xl">{user.name?.charAt(0) || user.email.charAt(0)}</span>
+              </div>
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">{user.name ?? "User"}</h2>
+              <p className="text-gray-400">{user.email}</p>
+            </div>
+          </div>
+          <nav className="space-y-2">
+            {["overview", "chatbots", "settings"].map((section) => (
+              <button
+                key={section}
+                onClick={() => setActiveSection(section as any)}
+                className={`neo-brutalism w-full flex items-center gap-2 px-4 py-2 rounded-xl ${
+                  activeSection === section ? "bg-primary text-white" : "text-gray-300 hover:text-white"
+                }`}
+              >
+                {section === "overview" && <BarChart2 className="w-5 h-5" />}
+                {section === "chatbots" && <Bot className="w-5 h-5" />}
+                {section === "settings" && <Settings className="w-5 h-5" />}
+                {section.charAt(0).toUpperCase() + section.slice(1)}
+              </button>
+            ))}
+            <form action="/logout" method="post">
+              <button
+                type="submit"
+                className="neo-brutalism w-full flex items-center gap-2 px-4 py-2 rounded-xl text-gray-300 hover:text-white"
+              >
+                <LogOut className="w-5 h-5" />
+                Logout
+              </button>
+            </form>
+          </nav>
+        </div>
+
+        {/* Main Panel */}
+        <div className="md:w-3/4 glass-card p-6 rounded-2xl shadow-xl">
+          {activeSection === "overview" && (
+            <>
+              <h1 className="text-3xl font-bold text-white mb-6">Control Panel Overview</h1>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                <div className="stats shadow bg-base-100">
+                  <div className="stat">
+                    <div className="stat-title">Active Chatbots</div>
+                    <div className="stat-value">{chatbots.length}</div>
+                  </div>
+                </div>
+                <div className="stats shadow bg-base-100">
+                  <div className="stat">
+                    <div className="stat-title">Total Messages</div>
+                    <div className="stat-value">{analytics.total_messages}</div>
+                  </div>
+                </div>
+                <div className="stats shadow bg-base-100">
+                  <div className="stat">
+                    <div className="stat-title">Conversations</div>
+                    <div className="stat-value">{analytics.total_conversations}</div>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold text-white mb-4">Usage Over Last 7 Days</h3>
+                <pre className="bg-base-200 p-4 rounded">{JSON.stringify(analytics.usage, null, 2)}</pre>
+              </div>
+            </>
+          )}
+
+          {activeSection === "chatbots" && (
+            <>
+              <div className="flex justify-between items-center mb-6">
+                <h1 className="text-3xl font-bold text-white">Your Chatbots</h1>
+                <Link to="/chatbot/new" className="btn btn-primary gap-2">
+                  <Bot className="w-5 h-5" />
+                  New Chatbot
+                </Link>
+              </div>
+              <Suspense fallback={<div className="skeleton h-32 w-full"></div>}>
+                <div className="overflow-x-auto">
+                  <table className="table table-zebra w-full">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Created</th>
+                        <th>API Key</th>
+                        <th>Embed Code</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {chatbots.map((bot) => (
+                        <tr key={bot.id}>
+                          <td>{bot.name}</td>
+                          <td>{new Date(bot.createdAt).toLocaleDateString()}</td>
+                          <td>
+                            <div className="badge badge-ghost font-mono truncate max-w-[120px]">{bot.connectionString}</div>
+                          </td>
+                          <td>
+                            <details className="dropdown">
+                              <summary className="btn btn-xs">Show</summary>
+                              <ul className="p-2 shadow menu dropdown-content bg-base-100 rounded-box w-64">
+                                <li>
+                                  <details>
+                                    <summary>React</summary>
+                                    <pre className="text-xs whitespace-pre-wrap">{bot.embed.react}</pre>
+                                  </details>
+                                </li>
+                                <li>
+                                  <details>
+                                    <summary>Vanilla JS</summary>
+                                    <pre className="text-xs whitespace-pre-wrap">{bot.embed.vanillaJs}</pre>
+                                  </details>
+                                </li>
+                              </ul>
+                            </details>
+                          </td>
+                          <td>
+                            <Link to={`/chatbot/${bot.id}`} className="btn btn-ghost btn-xs">Manage</Link>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Suspense>
+            </>
+          )}
+
+          {activeSection === "settings" && (
+            <>
+              <h1 className="text-3xl font-bold text-white mb-6">Account Settings</h1>
+              <div className="space-y-4">
+                <div className="form-control">
+                  <label className="label"><span className="label-text text-white">Email</span></label>
+                  <input type="email" value={user.email} disabled className="input input-bordered w-full" />
+                </div>
+                <div className="form-control">
+                  <label className="label"><span className="label-text text-white">Name</span></label>
+                  <input type="text" value={user.name ?? ""} disabled className="input input-bordered w-full" />
+                </div>
+                <div className="form-control">
+                  <label className="label"><span className="label-text text-white">Account Created</span></label>
+                  <input type="text" value={new Date(user.createdAt).toLocaleDateString()} disabled className="input input-bordered w-full" />
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Cpanel;// components/PreviewMode.tsx
+import { ChatToggler } from './chatToggler'
+
+export const PreviewMode = () => {
+  return (
+    <div className="mockup-window border bg-base-300">
+      <div className="px-4 py-16 bg-base-200">
+        <ChatToggler />
+        <div className="text-center mt-4">
+          <div className="badge badge-accent">Preview Mode</div>
+        </div>
+      </div>
+    </div>
+  )
+}// components/PromptSuggestions.tsx
+export const PromptSuggestions = () => {
+    const suggestions = [
+      "How do I reset my password?",
+      "What's your return policy?",
+      "Where are you located?"
+    ]
+  
+    function handleSuggestionClick(text: string): void {
+        throw new Error("Function not implemented.")
+    }
+
+    return (
+      <div className="flex flex-wrap gap-2 mt-4">
+        {suggestions.map((text, i) => (
+          <button
+            key={i}
+            className="btn btn-xs btn-outline"
+            onClick={() => handleSuggestionClick(text)}
+          >
+            {text}
+          </button>
+        ))}
+      </div>
+    )
+  }// components/ChatInterface.tsx
+import { useState } from 'react'
+
+export const ChatInterface = () => {
+  const [messages, setMessages] = useState<Array<{content: string, isBot: boolean}>>([])
+  const [input, setInput] = useState('')
+
+  const staticResponses = {
+    greeting: 'Hello! How can I help you?',
+    farewell: 'Goodbye! Have a great day!',
+    help: 'Here are some things I can help with: [options]'
+  }
+
+  const handleSend = () => {
+    if (!input.trim()) return
+    
+    // Add user message
+    setMessages(prev => [...prev, {content: input, isBot: false}])
+    
+    // Add bot response
+    const response = getBotResponse(input)
+    setMessages(prev => [...prev, {content: response, isBot: true}])
+    
+    setInput('')
+  }
+
+  const getBotResponse = (message: string) => {
+    const lowerMsg = message.toLowerCase()
+    return staticResponses[
+      lowerMsg.includes('hello') ? 'greeting' :
+      lowerMsg.includes('bye') ? 'farewell' : 'help'
+    ]
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="h-64 overflow-y-auto">
+        {messages.map((msg, i) => (
+          <div key={i} className={`chat ${msg.isBot ? 'chat-start' : 'chat-end'}`}>
+            <div className={`chat-bubble ${msg.isBot ? 'bg-neutral' : 'bg-primary'}`}>
+              {msg.content}
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      <div className="join w-full">
+        <input
+          type="text"
+          className="input input-bordered join-item flex-1"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+        />
+        <button onClick={handleSend} className="btn btn-primary join-item">
+          Send
+        </button>
+      </div>
+    </div>
+  )
+}// app/components/layout/navbar.tsx
+import { useState } from "react";
+import { Link } from "@remix-run/react";
+import { Menu, X } from "lucide-react";
+import { motion } from "framer-motion";
+
+export const Navbar = () => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [hoveredPath, setHoveredPath] = useState("");
+
+  return (
+    <nav className="navbar bg-gradient-to-b from-background/95 to-background/90 shadow-lg glass neo-brutalism">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between h-16">
+          <div className="flex">
+            <Link to="/" className="flex-shrink-0 flex items-center">
+              <span className="text-xl font-bold bg-gradient-to-r from-primary via-secondary to-primary bg-[200%_auto] animate-gradient-rotate bg-clip-text text-transparent">
+                ChatBuilder
+              </span>
+            </Link>
+          </div>
+          <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+            <Link
+              to="/docs"
+              className="neo-brutalism inline-flex items-center gap-2 text-gray-300 hover:text-white px-3 py-2 rounded-xl text-sm font-medium"
+              onMouseEnter={() => setHoveredPath("/docs")}
+              onMouseLeave={() => setHoveredPath("")}
+            >
+              Docs
+              {hoveredPath === "/docs" && (
+                <motion.div
+                  layoutId="navbar-hover"
+                  className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-xl glass"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                />
+              )}
+            </Link>
+            <Link
+              to="/pricing"
+              className="neo-brutalism inline-flex items-center gap-2 text-gray-300 hover:text-white px-3 py-2 rounded-xl text-sm font-medium"
+              onMouseEnter={() => setHoveredPath("/pricing")}
+              onMouseLeave={() => setHoveredPath("")}
+            >
+              Pricing
+              {hoveredPath === "/pricing" && (
+                <motion.div
+                  layoutId="navbar-hover"
+                  className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-xl glass"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                />
+              )}
+            </Link>
+            <Link
+              to="/dashboard"
+              className="neo-brutalism inline-flex items-center gap-2 text-gray-300 hover:text-white px-3 py-2 rounded-xl text-sm font-medium"
+              onMouseEnter={() => setHoveredPath("/dashboard")}
+              onMouseLeave={() => setHoveredPath("")}
+            >
+              Dashboard
+              {hoveredPath === "/dashboard" && (
+                <motion.div
+                  layoutId="navbar-hover"
+                  className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-xl glass"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                />
+              )}
+            </Link>
+          </div>
+          <div className="flex items-center sm:hidden">
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className="neo-brutalism inline-flex items-center gap-2 btn btn-ghost btn-square"
+            >
+              {isOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="sm:hidden bg-gradient-to-b from-background/95 to-background/90 glass neo-brutalism">
+          <div className="pt-2 pb-3 space-y-1">
+            <Link to="/docs" className="neo-brutalism inline-flex items-center gap-2 px-3 py-2 text-base font-medium text-gray-300 hover:text-white">
+              Docs
+            </Link>
+            <Link to="/pricing" className="neo-brutalism inline-flex items-center gap-2 px-3 py-2 text-base font-medium text-gray-300 hover:text-white">
+              Pricing
+            </Link>
+            <Link to="/dashboard" className="neo-brutalism inline-flex items-center gap-2 px-3 py-2 text-base font-medium text-gray-300 hover:text-white">
+              Dashboard
+            </Link>
+          </div>
+        </div>
+      )}
+    </nav>
+  );
+};// app/components/PromptEditor.tsx
+import { useState } from "react";
+import toast from "react-hot-toast";
+
+const PromptEditor = () => {
+  const [prompts, setPrompts] = useState([{ trigger: "", response: "" }]);
+  const [suggestions] = useState([
+    { trigger: "greeting", response: "Hello! How can I help you today?" },
+    { trigger: "farewell", response: "Goodbye! Have a great day!" }
+  ]);
+
+  const addPrompt = () => {
+    setPrompts([...prompts, { trigger: "", response: "" }]);
+  };
+
+  const removePrompt = (index: number) => {
+    setPrompts(prompts.filter((_, i) => i !== index));
+  };
+
+  const handlePromptSave = () => {
+    if (prompts.some(p => !p.trigger.trim() || !p.response.trim())) {
+      toast.error('All prompts require both trigger and response');
+      return;
+    }
+    toast.success('Prompts saved successfully');
+  };
+
+  return (
+    <div className="card bg-base-200 shadow-xl p-6">
+      <h3 className="text-xl font-bold mb-4">Prompt Engineering</h3>
+      
+      <div className="grid gap-4">
+        {prompts.map((prompt, index) => (
+          <div key={index} className="flex gap-2 items-center">
+            <input
+              type="text"
+              placeholder="Trigger"
+              value={prompt.trigger}
+              onChange={(e) => setPrompts(
+                prompts.map((p, i) => 
+                  i === index ? { ...p, trigger: e.target.value } : p
+                )
+              )}
+              className="input input-bordered flex-1"
+            />
+            <input
+              type="text"
+              placeholder="Response"
+              value={prompt.response}
+              onChange={(e) => setPrompts(
+                prompts.map((p, i) => 
+                  i === index ? { ...p, response: e.target.value } : p
+                )
+              )}
+              className="input input-bordered flex-1"
+            />
+            <button 
+              onClick={() => removePrompt(index)}
+              className="btn btn-circle btn-error btn-sm"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button onClick={addPrompt} className="btn btn-primary">
+          Add Prompt
+        </button>
+        <button onClick={handlePromptSave} className="btn btn-success">
+          Save Prompts
+        </button>
+      </div>
+
+      <div className="mt-6">
+        <h4 className="text-lg font-semibold mb-2">Suggestions</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          {suggestions.map((suggestion, index) => (
+            <div key={index} className="card bg-base-100 p-2 cursor-pointer"
+              onClick={() => setPrompts([...prompts, suggestion])}
+            >
+              <div className="font-medium">{suggestion.trigger}</div>
+              <div className="text-sm opacity-75">{suggestion.response}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default PromptEditor;// components/AnalyticsChart.tsx
+import { useMemo } from 'react';
+import { Line } from 'react-chartjs-2';
+import { Chart, registerables } from 'chart.js';
+import type { AnalyticsData } from '../types/types'; // Assuming AnalyticsData type is defined
+
+Chart.register(...registerables);
+
+interface AnalyticsChartProps {
+  analyticsData: AnalyticsData[]; // Expecting an array of AnalyticsData
+}
+
+function AnalyticsChart({ analyticsData }: AnalyticsChartProps) {
+  const chartData = useMemo(() => {
+    return {
+      labels: analyticsData.map(data => data.date), // Assuming AnalyticsData has a date field
+      datasets: [
+        {
+          label: 'Messages Over Time',
+          data: analyticsData.map(data => data.messages), // Assuming AnalyticsData has a messages field
+          borderColor: 'rgb(75, 192, 192)',
+          tension: 0.1,
+        },
+      ],
+    };
+  }, [analyticsData]);
+
+  const chartOptions = useMemo(() => {
+    return {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: 'top' as const,
+        },
+        title: {
+          display: true,
+          text: 'Messages Trend',
+        },
+      },
+    };
+  }, []);
+
+  return <Line options={chartOptions} data={chartData} />;
+}
+
+export default AnalyticsChart;// app/components/chatPreview.tsx
+import { useState } from "react";
+import { Trash2 } from "lucide-react";
+
+// Unified Message type matching Prisma schema
+interface Message {
+  id: string;
+  content: string;
+  role: "user" | "assistant";
+  createdAt: Date;
+}
+
+// Full ChatSettings type matching Prisma model
+interface ChatSettings {
+  chatWidth: number;
+  chatHeight: number;
+  chatBackground: string;
+  chatOpacity: number;
+  chatBorderRadius: number;
+  brandColor: string;
+  customLogo?: string | null;
+  showEmailCapture: boolean;
+  emailPlaceholder: string;
+  quickReplies: Array<{ text: string; action: string }>;
+  userBubbleColor: string;
+  aiBubbleColor: string;
+  headingColor: string;
+}
+
+interface ChatPreviewProps {
+  messages: Array<{
+    id: string;
+    content: string;
+    role: "user" | "assistant";
+    createdAt: Date;
+  }>;
+  onSendMessage: (message: string) => void;
+  settings: ChatSettings;
+  isLoading?: boolean;
+}
+
+export const ChatPreview = ({ messages, onSendMessage, settings, isLoading }: ChatPreviewProps) => {
+  const [email, setEmail] = useState("");
+  
+  // Proper type for quick reply handler
+  const handleSuggestionClick = (text: string) => {
+    onSendMessage(text);
+  };
+
+  return (
+    <div
+      className="chat-preview relative"
+      style={{
+        width: `${settings.chatWidth}px`,
+        height: `${settings.chatHeight}px`,
+        background: settings.chatBackground,
+        opacity: settings.chatOpacity,
+        borderRadius: `${settings.chatBorderRadius}px`,
+        boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+      }}
+    >
+      <div
+        className="header p-3 flex items-center"
+        style={{ 
+          background: settings.brandColor, 
+          color: settings.headingColor, 
+          borderRadius: `${settings.chatBorderRadius}px ${settings.chatBorderRadius}px 0 0` 
+        }}
+      >
+        {settings.customLogo && (
+          <img 
+            src={settings.customLogo} 
+            alt="Logo" 
+            className="w-8 h-8 mr-2 rounded-full" 
+          />
+        )}
+        <h3 className="text-lg font-semibold">Chatbot</h3>
+      </div>
+      
+      <div 
+        className="messages p-4 overflow-y-auto" 
+        style={{ height: `${settings.chatHeight - 150}px` }}
+      >
+        {messages.map((msg) => (
+          <div
+            key={msg.id || msg.content}
+            className={`message mb-2 p-3 rounded-lg ${msg.role === "user" ? "ml-auto" : "mr-auto"}`}
+            style={{
+              background: msg.role === "user" 
+                ? settings.userBubbleColor 
+                : settings.aiBubbleColor,
+              maxWidth: "80%",
+              color: "#000000",
+            }}
+          >
+            <p>{msg.content}</p>
+            <small className="text-xs opacity-70 block mt-1">
+              {msg.createdAt.toLocaleTimeString()}
+            </small>
+          </div>
+        ))}
+        
+        {isLoading && (
+          <div 
+            className="message mb-2 p-3 rounded-lg mr-auto" 
+            style={{ background: settings.aiBubbleColor }}
+          >
+            <span className="loading loading-spinner"></span>
+          </div>
+        )}
+      </div>
+
+      {settings.showEmailCapture && !email && (
+        <div className="email-capture p-4">
+          <input
+            type="email"
+            placeholder={settings.emailPlaceholder}
+            className="input input-bordered w-full"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
+      )}
+
+      <div className="suggestions p-4 border-t">
+        {settings.quickReplies.map((reply, index) => (
+          <button
+            key={index}
+            className="btn btn-sm btn-outline mr-2 mb-2"
+            onClick={() => handleSuggestionClick(reply.text)}
+            style={{ 
+              background: settings.brandColor, 
+              color: "#ffffff",
+              borderColor: settings.brandColor
+            }}
+          >
+            {reply.text}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};// components/Skeleton.tsx
+export default function Skeleton({ lines = 3 }: { lines?: number }) {
+    return (
+      <div className="animate-pulse space-y-4">
+        {Array.from({ length: lines }).map((_, i) => (
+          <div key={i} className="h-4 bg-gray-200 rounded w-full" />
+        ))}
+      </div>
+    );
+  }// components/ChatToggler.tsx
+import { useState } from 'react'
+import {ChatInterface} from './chatInterface'
+import { ChatPreview } from './chatPreview'
+export const ChatToggler = () => {
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <div className="fixed bottom-4 right-4">
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="btn btn-circle btn-primary shadow-lg"
+      >
+        {isOpen ? '×' : '💬'}
+      </button>
+      
+      <div className={`${isOpen ? 'block' : 'hidden'} chat-window`}>
+        <div className="card w-96 bg-base-100 shadow-xl">
+          <div className="card-body">
+            <ChatPreview settings={{
+              chatWidth: undefined,
+              chatHeight: undefined,
+              chatBackground: '',
+              chatOpacity: 0,
+              chatBorderRadius: 0,
+              brandColor: '',
+              customLogo: undefined,
+              showEmailCapture: false,
+              emailPlaceholder: '',
+              quickReplies: [],
+              capturedEmail: undefined,
+              onEmailCapture: function (value: string): void {
+                throw new Error('Function not implemented.')
+              }
+            }} messages={[]} onSendMessage={function (message: string): void {
+              throw new Error('Function not implemented.')
+            } } />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}interface TabProps {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+}
+
+const Tab = ({ id, label, icon, activeTab, setActiveTab }: TabProps) => {
+  const isActive = activeTab === id;
+  return (
+    <button
+      onClick={() => setActiveTab(id)}
+      className={`flex items-center space-x-2 px-4 py-2 rounded-lg ${
+        isActive ? "bg-primary text-white" : "text-gray-400 hover:text-white"
+      }`}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
+};
+
+export default Tab;
+// app/components/ErrorComponent.tsx
+import { Link, useRouteError } from "@remix-run/react";
+import { motion } from "framer-motion";
+import type { ReactNode } from "react";
+import { Navbar } from "./layout/navbar"; // Import your Navbar component
+
+interface ErrorComponentProps {
+  status?: number;
+  title?: string;
+  message?: string;
+  children?: ReactNode;
+  authenticated?: boolean;
+}
+
+const statusMessages: Record<number, string> = {
+  400: "The request sent to the server was invalid or corrupted",
+  401: "Authentication required to access this resource",
+  403: "You don't have permission to view this content",
+  404: "The page you're looking for doesn't exist",
+  500: "Our servers encountered an unexpected condition",
+  503: "We're performing maintenance - please check back soon",
+};
+
+const defaultTitles: Record<number, string> = {
+  400: "Invalid Request",
+  401: "Authorization Required",
+  403: "Access Restricted",
+  404: "Page Not Found",
+  500: "Server Error", 
+  503: "Service Unavailable",
+};
+
+export default function ErrorComponent({
+  status,
+  title,
+  message,
+  children,
+  authenticated = false,
+}: ErrorComponentProps) {
+  const error = useRouteError();
+  const effectiveStatus = status || (error as any)?.status || 500;
+  
+  // Dynamic content resolution with fallbacks
+  const errorTitle = title || defaultTitles[effectiveStatus] || "Unexpected Error";
+  const errorMessage = message || statusMessages[effectiveStatus] || 
+    "An unexpected error occurred. Our engineering team has been notified.";
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-background/95 to-background/90">
+      <Navbar  />
+      
+      <motion.main
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="flex items-center justify-center p-8 pt-24" // Added pt-24 for navbar spacing
+      >
+        <div className="glass neo-brutalism p-8 rounded-2xl shadow-xl w-full max-w-2xl">
+          <div className="flex flex-col md:flex-row items-center gap-8">
+            {effectiveStatus && (
+              <div className="text-8xl font-bold bg-gradient-to-r from-error to-secondary bg-clip-text text-transparent">
+                {effectiveStatus}
+              </div>
+            )}
+            
+            <div className="space-y-4 flex-1">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                {errorTitle}
+              </h1>
+              <p className="text-lg text-gray-300 leading-relaxed">
+                {errorMessage}
+              </p>
+              
+              {children && (
+                <div className="mt-4 p-4 bg-background/50 rounded-lg">
+                  {children}
+                </div>
+              )}
+              
+              <div className="mt-8 flex flex-col sm:flex-row gap-4">
+                <Link
+                  to="/"
+                  className="btn btn-primary gap-2 hover:scale-[0.98] transition-transform"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path d="M5 13h8.5l-4 4-1.414-1.414L10.172 13H5v-2h8.5l-4-4 1.414-1.414L15.5 11H19v2h-6.172l2.586 2.586L14 17.5l-5-5 5-5 1.414 1.414L12.828 11H19v2z" />
+                  </svg>
+                  Return to Home
+                </Link>
+                
+                <Link
+                  to="/support"
+                  className="btn btn-outline gap-2 hover:bg-background/20"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path d="M3 18h12v-2H3v2zM3 6v2h18V6H3zm0 7h18v-2H3v2z" />
+                  </svg>
+                  Contact Support
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </motion.main>
+    </div>
+  );
+}// app/utils/auth.server.ts
+import { redirect } from "@remix-run/node";
+import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
+import { User } from "~/types/types"; // Assuming User type is defined in types.ts
+
+export async function requireAuth(request: Request): Promise<User> {
+  const { isAuthenticated, getUser } = await getKindeSession(request);
+  if (!(await isAuthenticated())) {
+    throw redirect("/login");
+  }
+  const user = await getUser();
+  if (!user || !user.email) {
+    throw redirect("/login"); // Ensure user is not null and has an email
+  }
+  return user as unknown as User; // Cast to User type, ensuring non-null
+}async function generateCode(language: string, prompt: string) {
+    // Implement your code generation logic here
+    // This could use an AI model or template-based generation
+    const templates = {
+      javascript: `
+  function ${prompt.toLowerCase().replace(/\s+/g, '')}() {
+    // Generated code for ${prompt}
+    console.log('Implementing ${prompt}');
+  }
+      `,
+      python: `
+  def ${prompt.toLowerCase().replace(/\s+/g, '_')}():
+      # Generated code for ${prompt}
+      print('Implementing ${prompt}')
+      `,
+      react: `
+  import React from 'react';
+  
+  export const ${prompt.replace(/\s+/g, '')} = () => {
+    return (
+      <div>
+        <h1>${prompt}</h1>
+      </div>
+    );
+  };
+      `,
+    };
+  
+    return templates[language as keyof typeof templates] || 'Language not supported';
+  }// app/utils/embed.server.ts
+import { ChatSettings, EmbedCode } from "~/types/types";
+
+export function generateEmbedCode(settings: ChatSettings, connectionString: string): EmbedCode {
+  const { brandColor, customLogo, chatWidth, chatHeight } = settings;
+
+  const reactCode = `
+import React from 'react';
+import { ChatbotWidget } from 'chatbot-sdk';
+
+export const Chatbot = () => (
+  <ChatbotWidget
+    connectionString="${connectionString}"
+    brandColor="${brandColor}"
+    ${customLogo ? `customLogo="${customLogo}"` : ""}
+    chatWidth={${chatWidth}}
+    chatHeight={${chatHeight}}
+  />
+);
+`.trim();
+
+  const vanillaJsCode = `
+<script src="https://yourdomain.com/chatbot.js"></script>
+<div id="chatbot-container"></div>
+<script>
+  const chatbot = new Chatbot({
+    connectionString: "${connectionString}",
+    brandColor: "${brandColor}",
+    ${customLogo ? `customLogo: "${customLogo}",` : ""}
+    chatWidth: ${chatWidth},
+    chatHeight: ${chatHeight}
+  });
+  chatbot.init("chatbot-container");
+</script>
+`.trim();
+
+  return { react: reactCode, vanillaJs: vanillaJsCode };
+}// app/utils/usage.server.ts
+import { redis } from "./redis.server";
+import prisma from "./prisma.server";
+import { Logger } from "./logger.server";
+import { AnalyticsData } from "~/types/types";
+
+export async function trackUsage(chatbotId: string, action: "message" | "api_call") {
+  const today = new Date().toISOString().split("T")[0];
+  const key = `usage:${chatbotId}:${today}`;
+
+  try {
+    await redis.incr(`${key}:${action}`);
+    Logger.info(`Tracked ${action} for chatbot ${chatbotId}`, { date: today });
+  } catch (err) {
+    Logger.error("Failed to track usage in Redis", { error: err, chatbotId });
+  }
+
+  // Persist to Prisma periodically (e.g., via cron job)
+  await prisma.usage.upsert({
+    where: { chatbotId_date: { chatbotId, date: today } },
+    update: { [action]: { increment: 1 } },
+    create: { chatbotId, date: today, [action]: 1, api_calls: 0, messages: 0 },
+  });
+}
+
+export async function getUsage(chatbotId: string, days: number = 7): Promise<AnalyticsData["usage"]> {
+  const usage = [];
+  for (let i = 0; i < days; i++) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    const dateStr = date.toISOString().split("T")[0];
+    const key = `usage:${chatbotId}:${dateStr}`;
+    const messages = Number(await redis.get(`${key}:message`) || 0);
+    usage.push({ date: dateStr, messages });
+  }
+  return usage;
+}// Singleton pattern for Prisma client
+import { PrismaClient } from '@prisma/client';
+
+declare global {
+  var prisma: PrismaClient | undefined;
+}
+
+const prisma = global.prisma || new PrismaClient();
+
+if (process.env.NODE_ENV !== 'production') global.prisma = prisma;
+
+export default prisma;// app/utils/redis.server.ts
+import { Redis } from "@upstash/redis";
+import { Ratelimit } from "@upstash/ratelimit";
+import { RateLimiterResponse } from "../types/types";
+
+export const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+});
+
+export const rateLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(100, "60 s"), // 100 requests per minute
+  analytics: true,
+  prefix: "chatbot:ratelimit",
+});
+
+export async function limitRequest(ip: string): Promise<RateLimiterResponse> {
+  return rateLimiter.limit(ip);
+}// app/utils/gemini.server.ts (Commented out original for reference)
+/*
+export const generateResponse = async (message: string, context: string): Promise<string> => {
+  // Original Gemini logic
+  return "Response from Gemini"; // Placeholder
+};
+*/
+
+// Updated with LangChain and Astra DB
+import { AstraDB } from "@datastax/astra-db-ts";
+import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
+import { AstraDBVectorStore } from "@langchain/community/vectorstores/astradb";
+import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
+import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { RunnableSequence } from "@langchain/core/runnables";
+import { StringOutputParser } from "@langchain/core/output_parsers";
+import { PromptTemplate } from "@langchain/core/prompts";
+
+const astraDb = new AstraDB(process.env.ASTRA_TOKEN, process.env.ASTRA_ENDPOINT, process.env.ASTRA_NAMESPACE);
+const embeddings = new GoogleGenerativeAIEmbeddings({ apiKey: process.env.GEMINI_API_KEY });
+const llm = new ChatGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY, model: "gemini-1.5-pro" });
+
+// Initialize vector store (run once or on setup)
+async function initializeVectorStore() {
+  const splitter = new RecursiveCharacterTextSplitter({ chunkSize: 1000, chunkOverlap: 200 });
+  const docs = [
+    "Sample document content about chatbots...",
+    // Add more docs or load from a source
+  ];
+  const splitDocs = await splitter.createDocuments(docs);
+  await AstraDBVectorStore.fromDocuments(splitDocs, embeddings, {
+    collection: "chatbot_docs",
+    client: astraDb,
+  });
+}
+
+// Export this if you need to initialize elsewhere
+export { initializeVectorStore };
+
+export const generateResponse = async (message: string, context: string): Promise<string> => {
+  const vectorStore = await AstraDBVectorStore.fromExistingCollection(embeddings, {
+    collection: "chatbot_docs",
+    client: astraDb,
+  });
+
+  const retriever = vectorStore.asRetriever();
+  const prompt = PromptTemplate.fromTemplate(
+    "Answer based on the following context:\n{context}\n\nQuestion: {question}"
+  );
+
+  const chain = RunnableSequence.from([
+    {
+      context: retriever.pipe((docs) => docs.map((doc) => doc.pageContent).join("\n")),
+      question: (input) => input.question,
+    },
+    prompt,
+    llm,
+    new StringOutputParser(),
+  ]);
+
+  return await chain.invoke({ question: message });
+};// ~/utils/astra.server.ts
+import { DataAPIClient, Db } from "@datastax/astra-db-ts";
+
+/**
+ * Connects to a DataStax Astra database.
+ * Expects the environment variables:
+ *   ASTRA_DB_API_ENDPOINT and ASTRA_DB_APPLICATION_TOKEN.
+ */
+export function connectToDatabase(): Db {
+  const { ASTRA_DB_API_ENDPOINT: endpoint, ASTRA_DB_APPLICATION_TOKEN: token } = process.env;
+  if (!token || !endpoint) {
+    throw new Error("ASTRA_DB_API_ENDPOINT and ASTRA_DB_APPLICATION_TOKEN must be defined.");
+  }
+  const client = new DataAPIClient(token);
+  const database = client.db(endpoint);
+  console.log(`Connected to database ${database.id}`);
+  return database;
+}
+// app/utils/logger.server.ts
+import { join } from "path";
+
+type LogLevel = "info" | "error" | "warn";
+
+interface LogEntry {
+  timestamp: string;
+  level: LogLevel;
+  message: string;
+  data?: Record<string, any>;
+}
+
+export class Logger {
+  private static logFile = join(process.cwd(), "logs", "app.log");
+
+  static log(level: LogLevel, message: string, data?: Record<string, any>) {
+    const entry: LogEntry = {
+      timestamp: new Date().toISOString(),
+      level,
+      message,
+      data,
+    };
+    const logString = JSON.stringify(entry) + "\n";
+
+    // Output log to the terminal
+    console.log(logString);
+
+    // Optionally, you can still write to the log file if needed
+    /*
+    try {
+      writeFileSync(this.logFile, logString, { flag: "a" });
+    } catch (err) {
+      console.error("Failed to write log:", err);
+    }
+    */
+  }
+
+  static info(message: string, data?: Record<string, any>) {
+    this.log("info", message, data);
+  }
+
+  static error(message: string, data?: Record<string, any>) {
+    this.log("error", message, data);
+  }
+
+  static warn(message: string, data?: Record<string, any>) {
+    this.log("warn", message, data);
+  }
+}
