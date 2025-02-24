@@ -6,7 +6,7 @@ import { LoaderFunctionArgs } from "@remix-run/node";
 import prisma from "~/utils/prisma.server";
 import { Suspense, useState } from "react";
 import { Settings, BarChart2, Bot, User, LogOut } from "lucide-react";
-import { getUsage } from "~/utils/usage.server";
+import { checkRateLimit } from "~/utils/usage.server";
 import { Logger } from "~/utils/logger.server";
 import { generateEmbedCode } from "~/utils/embed.server"; // Server-only import stays in loader
 import { ChatSettings, EmbedCode } from "~/types/types";
@@ -81,7 +81,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       const totalConversations = await prisma.conversation.count({
         where: { chatbotId: { in: chatbotIds } },
       });
-      const usage = await Promise.all(chatbots.map((c) => getUsage(c.id)));
+      const usage = await Promise.all(chatbots.map((c) => checkRateLimit(c.id)));
       analytics = {
         total_messages: totalMessages,
         total_conversations: totalConversations,

@@ -25,8 +25,17 @@ model Chatbot {
   settings        ChatSettings?
   conversations   Conversation[]
   createdAt       DateTime      @default(now())
-}
 
+  Prompt Prompt[]
+}
+model Prompt {
+  id         String   @id @default(uuid()) @map("_id")
+  chatbotId  String
+  chatbot    Chatbot  @relation(fields: [chatbotId], references: [id])
+  trigger    String
+  response   String
+  createdAt  DateTime @default(now())
+}
 model ChatSettings {
   id               String   @id @default(auto()) @map("_id") @db.ObjectId
   chatbotId        String   @unique @db.ObjectId

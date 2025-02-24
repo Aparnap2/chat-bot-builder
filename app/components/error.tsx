@@ -47,7 +47,7 @@ export default function ErrorComponent({
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background/95 to-background/90">
-      <Navbar  />
+     
       
       <motion.main
         initial={{ opacity: 0, y: 20 }}

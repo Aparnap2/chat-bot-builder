@@ -1,10 +1,8 @@
-// app/routes/login.tsx
-import { useState } from "react";
-import { json, Link, redirect } from "@remix-run/react";
+import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { Link } from "@remix-run/react";
 import { toast } from "react-hot-toast";
 import { ArrowRight } from "lucide-react";
 import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
-import { LoaderFunctionArgs } from "@remix-run/node";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { isAuthenticated } = await getKindeSession(request);
@@ -12,15 +10,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return json({});
 };
 
-function login({ authUrlParams }: { authUrlParams: { connection_id: string } }) {
-  const url = `/kinde-auth/login?connection_id=${authUrlParams.connection_id}`;
-  toast("Redirecting to Google sign in...");
-  window.location.href = url;
-}
-
-const Login = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+export default function Login() {
+  const handleClick = () => {
+    toast("Redirecting to Google sign in...");
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background/95 to-background/90 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -39,18 +32,13 @@ const Login = () => {
       </div>
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
         <div className="glass-card py-8 px-4 shadow-2xl sm:rounded-2xl sm:px-10">
-          <button
-            onClick={() =>
-              login({
-                authUrlParams: {
-                  connection_id: "conn_0190c847b77996ef9532a4f639f1bd5a",
-                },
-              })
-            }
+          <Link
+            to="/kinde-auth/login?connection_id=conn_0190c847b77996ef9532a4f639f1bd5a"
+            onClick={handleClick}
             className="neo-brutalism w-full flex justify-center items-center gap-2 py-2 px-4 bg-primary text-slate-900 text-sm font-medium rounded-xl"
           >
             Sign in with Google <ArrowRight className="w-4 h-4" />
-          </button>
+          </Link>
           <div className="mt-6">
             <div className="relative flex justify-center text-sm">
               <span className="px-2 text-gray-400">
@@ -65,15 +53,18 @@ const Login = () => {
       </div>
     </div>
   );
-};
-
-export default Login;// app/routes/dashboard.tsx
-import { json, redirect } from "@remix-run/node";
-import type { LoaderFunction } from "@remix-run/node";
-import { Link, useLoaderData } from "@remix-run/react";
+}import { json, redirect, LoaderFunction } from "@remix-run/node";
+import { useLoaderData, Link } from "@remix-run/react";
 import { PlusIcon } from "lucide-react";
 import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
 import prisma from "~/utils/prisma.server";
+//import { Navbar } from "~/components/layout/navbar";
+import { getUserMetrics } from "~/utils/usage.server";
+
+interface LoaderData {
+  chatbots: Array<{ id: string; name: string; createdAt: Date; connectionString: string }>;
+  metrics: { totalMessages: number; totalConversations: number; chatbotCount: number };
+}
 
 export const loader: LoaderFunction = async ({ request }) => {
   const session = await getKindeSession(request);
@@ -85,106 +76,112 @@ export const loader: LoaderFunction = async ({ request }) => {
     select: { id: true, name: true, createdAt: true, connectionString: true },
   });
 
-  const chatbotIds = chatbots.map((c) => c.id);
-  const totalMessages = await prisma.message.count({
-    where: { conversation: { chatbotId: { in: chatbotIds } } },
-  });
-  const totalConversations = await prisma.conversation.count({
-    where: { chatbotId: { in: chatbotIds } },
-  });
+  const metrics = await getUserMetrics(user.id);
 
-  return json({
-    user: { email: user.email, name: user.given_name || user.email },
-    chatbots: chatbots.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() })),
-    metrics: { totalMessages, totalConversations, chatbotCount: chatbots.length },
-  });
+  return json<LoaderData>({ chatbots, metrics });
 };
 
 export default function Dashboard() {
-  const { user, chatbots, metrics } = useLoaderData<typeof loader>();
+  const { chatbots, metrics } = useLoaderData<LoaderData>();
 
   return (
-    <div className="min-h-screen bg-base-100 p-4 md:p-8">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gray-900 text-white">
+      
+      <div className="max-w-5xl mx-auto p-8">
         <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="stats shadow bg-base-100">
-            <div className="stat">
-              <div className="stat-title">Chatbots</div>
-              <div className="stat-value">{metrics.chatbotCount}</div>
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-gray-800 p-4 rounded-lg shadow">
+            <p className="text-sm text-gray-400">Chatbots</p>
+            <p className="text-2xl font-bold">{metrics.chatbotCount}</p>
           </div>
-          <div className="stats shadow bg-base-100">
-            <div className="stat">
-              <div className="stat-title">Total Messages</div>
-              <div className="stat-value">{metrics.totalMessages}</div>
-            </div>
+          <div className="bg-gray-800 p-4 rounded-lg shadow">
+            <p className="text-sm text-gray-400">Total Messages</p>
+            <p className="text-2xl font-bold">{metrics.totalMessages}</p>
           </div>
-          <div className="stats shadow bg-base-100">
-            <div className="stat">
-              <div className="stat-title">Conversations</div>
-              <div className="stat-value">{metrics.totalConversations}</div>
-            </div>
+          <div className="bg-gray-800 p-4 rounded-lg shadow">
+            <p className="text-sm text-gray-400">Conversations</p>
+            <p className="text-2xl font-bold">{metrics.totalConversations}</p>
           </div>
         </div>
-
-        <div className="card bg-base-100 shadow-sm mb-8">
-          <div className="card-body">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="card-title">Your Chatbots</h2>
-              <Link to="/chatbot/new" className="btn btn-primary gap-2">
-                <PlusIcon className="w-4 h-4" />
-                New Chatbot
-              </Link>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="table table-zebra">
-                <thead>
+        <div className="bg-gray-800 p-6 rounded-lg shadow">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Your Chatbots</h2>
+            <Link to="/chatbot/new" className="btn btn-primary flex items-center gap-2">
+              <PlusIcon className="w-4 h-4" /> New Chatbot
+            </Link>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="table w-full">
+              <thead>
+                <tr className="text-gray-400">
+                  <th>Name</th>
+                  <th>Created</th>
+                  <th>API Key</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {chatbots.length === 0 ? (
                   <tr>
-                    <th>Name</th>
-                    <th className="hidden md:table-cell">Created</th>
-                    <th>API Key</th>
-                    <th>Actions</th>
+                    <td colSpan={4} className="text-center text-gray-500">
+                      No chatbots yet. Create one above!
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {chatbots.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="text-center">
-                        No chatbots yet. Create one above!
+                ) : (
+                  chatbots.map((bot) => (
+                    <tr key={bot.id}>
+                      <td>{bot.name}</td>
+                      <td>{new Date(bot.createdAt).toLocaleDateString()}</td>
+                      <td>
+                        <span className="badge badge-ghost font-mono truncate max-w-[120px]">{bot.connectionString}</span>
+                      </td>
+                      <td>
+                        <Link to={`/chatbot/${bot.id}`} className="btn btn-ghost btn-sm mr-2">Manage</Link>
+                        <Link to={`/chatbot/${bot.id}/customize`} className="btn btn-ghost btn-sm">Customize</Link>
                       </td>
                     </tr>
-                  ) : (
-                    chatbots.map((bot: any) => (
-                      <tr key={bot.id}>
-                        <td>{bot.name}</td>
-                        <td className="hidden md:table-cell">{new Date(bot.createdAt).toLocaleDateString()}</td>
-                        <td>
-                          <div className="badge badge-ghost font-mono truncate max-w-[120px]">{bot.connectionString}</div>
-                        </td>
-                        <td>
-                          <Link to={`/chatbot/${bot.id}`} className="btn btn-ghost btn-xs mr-2">Manage</Link>
-                          <Link to={`/chatbot/${bot.id}/customize`} className="btn btn-ghost btn-xs">Customize</Link>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
     </div>
   );
 }// app/routes/index.tsx
-import { Link } from "@remix-run/react";
-import { Navbar } from "../components/layout/navbar";
+import { useEffect } from "react";
+import { Link, useNavigate } from "@remix-run/react";
+import { LoaderFunctionArgs, json, redirect } from "@remix-run/node";
 import { Bot, BarChart2, Settings, ArrowRight } from "lucide-react";
+import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
 
-const Index = () => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const { isAuthenticated } = await getKindeSession(request);
+  if (await isAuthenticated()) {
+    return redirect("/profile");
+  }
+  return json({});
+};
+
+export default function Index() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Check local storage for user data
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      const user = JSON.parse(storedUser);
+      if (user?.id && user?.email) {
+        // Auto-redirect to /profile if user data exists
+        navigate("/profile");
+      }
+    }
+  }, [navigate]);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background/95 to-background/90 relative">
+      
       {/* 3D Elements */}
       <div className="hidden lg:block absolute inset-0 overflow-hidden">
         <div className="parallax-layer absolute inset-0">
@@ -193,8 +190,6 @@ const Index = () => {
           <div className="cube-3"></div>
         </div>
       </div>
-
-     
 
       {/* Hero Section */}
       <div className="relative overflow-hidden">
@@ -263,10 +258,7 @@ const Index = () => {
       </div>
     </div>
   );
-};
-
-export default Index;
-import type { LoaderFunctionArgs } from "@remix-run/node";
+}import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json, redirect } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 
@@ -298,10 +290,12 @@ export default Admin;
 // app/routes/kinde-auth.$index.tsx
 import { handleAuth } from "@kinde-oss/kinde-remix-sdk";
 import type { LoaderFunctionArgs } from "@remix-run/node";
-import  prisma  from "~/utils/prisma.server";
+import prisma from "~/utils/prisma.server";
+import { Logger } from "~/utils/logger.server";
 
 async function upsertUser(user: any) {
   if (!user || !user.id) {
+    Logger.error("No user data available in upsertUser");
     throw new Error("No user data available");
   }
   try {
@@ -313,7 +307,7 @@ async function upsertUser(user: any) {
         where: { email: user.email },
         data: {
           email: user.email,
-          name: user.name || "",
+          name: user.name || user.given_name || "",
         },
       });
     } else {
@@ -321,19 +315,29 @@ async function upsertUser(user: any) {
         data: {
           kindeId: user.id,
           email: user.email,
-          name: user.name || "",
+          name: user.name || user.given_name || "",
         },
       });
     }
+    // Store user data in local storage after upsert
+    const userData = {
+      id: user.id,
+      email: user.email,
+      name: user.name || user.given_name || "",
+    };
+    if (typeof window !== "undefined") {
+      localStorage.setItem("user", JSON.stringify(userData));
+    }
+    Logger.info("User upserted and stored in local storage", { userId: user.id, email: user.email });
   } catch (error) {
-    console.error("Error saving user to database:", error);
+    Logger.error("Error saving user to database", { error });
     throw error;
   }
 }
 
 export async function loader({ params, request }: LoaderFunctionArgs) {
   return await handleAuth(request, params.index, {
-    async onRedirectCallback({ user }: { user: { id: string; email: string; name?: string } }) {
+    async onRedirectCallback({ user }) {
       await upsertUser(user);
     },
   });
@@ -341,21 +345,19 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 
 export async function action({ params, request }: LoaderFunctionArgs) {
   return await handleAuth(request, params.index, {
-    async onRedirectCallback({ user }: { user: { id: string; email: string; name?: string } }) {
+    async onRedirectCallback({ user }) {
       await upsertUser(user);
     },
   });
-}
-import type { LoaderFunctionArgs } from "@remix-run/node";
-import { json, redirect } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
-import { Link } from "@remix-run/react";
+}// app/routes/profile.tsx
+import { useEffect } from "react";
+import { json, redirect, LoaderFunctionArgs } from "@remix-run/node";
+import { useLoaderData, Link } from "@remix-run/react";
 import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
-import prisma from "../utils/prisma.server";
+import prisma from "~/utils/prisma.server";
 import { Settings, BarChart2 } from "lucide-react";
-import { Navbar } from "~/components/layout/navbar";
 
-// Define types for the loader data
+
 type LoaderData = {
   user: {
     id: string;
@@ -365,17 +367,16 @@ type LoaderData = {
   kindeUser: {
     id: string;
     given_name: string;
-    family_name: string;
+    family_name?: string;
     email: string;
-    picture: string;
+    picture?: string | null;
   };
-  userProfile: any; // Type this according to your needs
+  userProfile: any;
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { getUser, getUserProfile, isAuthenticated, headers } = await getKindeSession(request);
 
-  // Check authentication first
   if (!(await isAuthenticated())) {
     throw redirect("/login", { headers });
   }
@@ -390,32 +391,38 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (!user) {
     throw redirect("/register", { headers });
   }
-  return json({ user, kindeUser: sessionUser, userProfile }, { headers });
+  return json<LoaderData>({ user, kindeUser: sessionUser, userProfile }, { headers });
 };
 
-const Profile = () => {
+export default function Profile() {
   const { user, kindeUser, userProfile } = useLoaderData<LoaderData>();
+
+  useEffect(() => {
+    // Store user data in local storage after successful login
+    const userData = {
+      id: kindeUser.id,
+      email: kindeUser.email,
+      name: kindeUser.given_name || "",
+    };
+    localStorage.setItem("user", JSON.stringify(userData));
+  
+  }, [kindeUser]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background/95 to-background/90">
-      {/* Navbar */}
- {/* 3D Elements */}
- <div className="hidden lg:block absolute inset-0 overflow-hidden">
+      
+      <div className="hidden lg:block absolute inset-0 overflow-hidden">
         <div className="parallax-layer absolute inset-0">
           <div className="cube-1"></div>
           <div className="cube-2"></div>
           <div className="cube-3"></div>
         </div>
       </div>
-      {/* Profile Section */}
-   
       <div className="relative overflow-hidden py-24">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.1)_0,transparent_70%)]" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center relative z-10">
             <div className="glass-card max-w-3xl mx-auto p-8 rounded-2xl mb-12">
-              
-              {/* Header */}
               <div className="flex flex-col md:flex-row items-center justify-between mb-8">
                 <div className="flex items-center space-x-4">
                   {kindeUser.picture && (
@@ -436,7 +443,6 @@ const Profile = () => {
                 </div>
               </div>
 
-              {/* User Details */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-b border-gray-700 py-2">
                   <span className="text-lg font-semibold text-white">Name</span>
@@ -448,7 +454,6 @@ const Profile = () => {
                   <span className="text-lg font-semibold text-white">Email</span>
                   <span className="text-lg text-gray-300">{kindeUser.email}</span>
                 </div>
-                
                 <div className="flex items-center justify-between border-b border-gray-700 py-2">
                   <span className="text-lg font-semibold text-white">Account Created</span>
                   <span className="text-lg text-gray-300">
@@ -465,7 +470,6 @@ const Profile = () => {
                 </div>
               </div>
 
-              {/* Navigation Buttons */}
               <div className="flex flex-col md:flex-row gap-4 justify-center mt-8">
                 <Link
                   to="/customization"
@@ -488,9 +492,7 @@ const Profile = () => {
       </div>
     </div>
   );
-};
-
-export default Profile;// app/routes/api/embed.$id.tsx
+}// app/routes/api/embed.$id.tsx
 import { json, LoaderFunctionArgs } from "@remix-run/node";
 import prisma from "~/utils/prisma.server";
 import { requireAuth } from "~/utils/auth.server";
@@ -604,490 +606,372 @@ export const action: ActionFunction = async ({ request, params }) => {
     default:
       return json({ error: "Invalid action" }, { status: 400 });
   }
-};// app/routes/chatbot.$id.customize.tsx
-import { useState } from "react";
-import { Form, useLoaderData, useNavigation, useActionData } from "@remix-run/react";
-import { LoaderFunctionArgs, redirect, json, ActionFunction } from "@remix-run/node";
+};// app/routes/chatbot.$id.tsx
+import { json, redirect, LoaderFunction, ActionFunction } from "@remix-run/node";
+import { useLoaderData, useFetcher } from "@remix-run/react";
+import { useState, useEffect } from "react";
 import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
 import prisma from "~/utils/prisma.server";
-import { Trash2 } from "lucide-react";
-import { ChatPreview } from "~/components/chatPreview";
-import { Prisma } from "@prisma/client";
+import { ChatToggler } from "~/components/chatToggler";
 
-// Type definitions
-interface QuickReply {
-  text: string;
-  action: string;
-}
+import { generateResponse } from "~/utils/gemini.server";
+import { checkRateLimit, trackUsage } from "~/utils/usage.server";
+import { Chatbot, Message } from "~/types/types";
 
-interface ChatSettings {
-  id: string;
-  chatbotId: string;
-  brandColor: string;
-  chatBackground: string;
-  chatOpacity: number;
-  chatBorderRadius: number;
-  customLogo: string | null;
-  chatWidth: number;
-  chatHeight: number;
-  showEmailCapture: boolean;
-  emailPlaceholder: string;
-  quickReplies: QuickReply[];
-  userBubbleColor: string;
-  aiBubbleColor: string;
-  headingColor: string;
-}
+import { Line } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
+
+// Register Chart.js components
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
 interface LoaderData {
-  chatbot: {
-    id: string;
-    name: string;
-    conversations: Array<{
-      messages: Array<{
-        content: string;
-        isUser: boolean;
-        createdAt: string;
-      }>;
-    }>;
+  chatbot: Chatbot;
+  messageCount: number;
+  codeSnippets: { vanillaJs: string; react: string };
+  metrics: {
+    totalMessages: number;
+    totalConversations: number;
+    usage: Array<{ date: string; messages: number }>;
   };
-  settings: ChatSettings;
 }
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { isAuthenticated } = await getKindeSession(request);
-  if (!(await isAuthenticated())) throw redirect("/login");
+interface ActionData {
+  userMessage?: Message;
+  aiMessage?: Message;
+  error?: string;
+}
 
-  const user = await (await getKindeSession(request)).getUser();
-  if (!user) throw json({ error: "User not found" }, { status: 401 });
+export const loader: LoaderFunction = async ({ request, params }) => {
+  const session = await getKindeSession(request);
+  const user = await session.getUser();
+  if (!user) throw redirect("/login");
 
-  const chatbot = await prisma.chatbot.findFirst({
+  // Fetch the chatbot and include its settings and conversations with messages (ordered chronologically)
+  const chatbotRaw = await prisma.chatbot.findFirst({
     where: { id: params.id, userId: user.id },
-    include: { 
+    include: {
       settings: true,
-      conversations: {
-        include: { messages: true }, // Include messages in each conversation
-        take: 1,
-        orderBy: { createdAt: 'asc' }
-      }
+      conversations: { include: { messages: { orderBy: { createdAt: "asc" } } } },
     },
   });
 
-  if (!chatbot) throw json({ error: "Chatbot not found" }, { status: 404 });
+  if (!chatbotRaw) throw json({ error: "Chatbot not found" }, { status: 404 });
 
-  const conversations = chatbot.conversations.map(convo => ({
-    messages: convo.messages.map(msg => ({
-      content: msg.content,
-      isUser: msg.role === "user", // Map role to isUser
-      createdAt: msg.createdAt.toISOString(), // convert Date to string
-    }))
-  }));
-  
-
-  // Default settings with proper type assertion
-  const settings: ChatSettings = chatbot.settings ? {
-    ...(chatbot.settings as unknown as ChatSettings),
-    quickReplies: chatbot.settings.quickReplies as unknown as QuickReply[] || []
-  } : {
-    id: '',
-    chatbotId: params.id!,
-    brandColor: "#2563eb",
-    chatBackground: "#ffffff",
-    chatOpacity: 1.0,
-    chatBorderRadius: 8,
-    customLogo: null,
-    chatWidth: 300,
-    chatHeight: 400,
-    showEmailCapture: false,
-    emailPlaceholder: "Enter your email",
-    quickReplies: [],
-    userBubbleColor: "#e0e0e0",
-    aiBubbleColor: "#2563eb",
-    headingColor: "#000000"
+  // Transform the raw data into our type-safe Chatbot type.
+  const chatbot: Chatbot = {
+    ...chatbotRaw,
+    createdAt: chatbotRaw.createdAt || new Date(),
+    settings: chatbotRaw.settings
+      ? {
+          ...chatbotRaw.settings,
+          quickReplies: Array.isArray(chatbotRaw.settings.quickReplies)
+            ? (chatbotRaw.settings.quickReplies as { text: string; action: string }[])
+            : [],
+        }
+      : null,
+    conversations: chatbotRaw.conversations.map((conv) => ({
+      id: conv.id,
+      messages: conv.messages.map((msg) => ({
+        id: msg.id,
+        content: msg.content,
+        role: msg.role as "user" | "assistant" | "system",
+        createdAt: msg.createdAt,
+      })),
+    })),
   };
 
-  return json<LoaderData>({ 
-    chatbot: {
-      id: chatbot.id,
-      name: chatbot.name,
-      conversations
-    },
-    settings
+  // Count total messages (across all conversations) for metrics
+  const messageCount = await prisma.message.count({
+    where: { conversation: { chatbotId: params.id } },
   });
-};
+  const totalConversations = chatbot.conversations.length;
 
+  // Get usage for the last 7 days
+  const usage = await Promise.all(
+    Array.from({ length: 7 }, (_, i) => {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split("T")[0];
+      return prisma.message
+        .count({
+          where: {
+            conversation: { chatbotId: params.id },
+            createdAt: {
+              gte: new Date(dateStr),
+              lte: new Date(dateStr + "T23:59:59"),
+            },
+          },
+        })
+        .then((messages) => ({ date: dateStr, messages }));
+    })
+  ).then((results) => results.reverse());
 
-// Define a type for the settings update data that matches what Prisma expects
-type ChatSettingsUpdateInput = Omit<ChatSettings, "id" | "chatbotId" | "quickReplies"> & {
-  quickReplies: Prisma.JsonValue;
-};
-
-export const action: ActionFunction = async ({ request, params }) => {
-  const { isAuthenticated } = await getKindeSession(request);
-  if (!(await isAuthenticated()))
-    return json({ error: "Unauthorized" }, { status: 401 });
-
-  const formData = await request.formData();
-  
-  const settingsData: ChatSettingsUpdateInput = {
-    brandColor: formData.get("brandColor") as string,
-    chatBackground: formData.get("chatBackground") as string,
-    chatOpacity: Number(formData.get("chatOpacity")),
-    chatBorderRadius: Number(formData.get("chatBorderRadius")),
-    customLogo: (formData.get("customLogo") as string) || null,
-    chatWidth: Number(formData.get("chatWidth")),
-    chatHeight: Number(formData.get("chatHeight")),
-    showEmailCapture: formData.get("showEmailCapture") === "true",
-    emailPlaceholder: formData.get("emailPlaceholder") as string,
-    // Parse the quickReplies value and cast it to Prisma.JsonValue
-    quickReplies: JSON.parse(formData.get("quickReplies") as string) as unknown as Prisma.JsonValue,
-    userBubbleColor: formData.get("userBubbleColor") as string,
-    aiBubbleColor: formData.get("aiBubbleColor") as string,
-    headingColor: formData.get("headingColor") as string,
-  };
-
-  try {
-    await prisma.chatSettings.upsert({
-      where: { chatbotId: params.id },
-      create: {
-        chatbotId: params.id!,
-        ...settingsData,
-      },
-      update: settingsData,
+  // Build dynamic code snippets for embedding (Vanilla JS and React)
+  const codeSnippets = chatbot.settings
+    ? {
+        vanillaJs: `
+<div id="chatbot" style="width: ${chatbot.settings.chatWidth}px; height: ${chatbot.settings.chatHeight}px; background: ${chatbot.settings.chatBackground}; opacity: ${chatbot.settings.chatOpacity}; border-radius: ${chatbot.settings.chatBorderRadius}px; position: fixed; bottom: 20px; right: 20px;">
+  <div style="background: ${chatbot.settings.brandColor}; color: ${chatbot.settings.headingColor}; padding: 10px; border-radius: ${chatbot.settings.chatBorderRadius}px ${chatbot.settings.chatBorderRadius}px 0 0;">
+    ${chatbot.name}
+  </div>
+  <div id="messages" style="padding: 10px; height: ${chatbot.settings.chatHeight - 100}px; overflow-y: auto;"></div>
+  <div style="padding: 10px; border-top: 1px solid #ccc;">
+    <input id="input" type="text" style="width: 80%; padding: 5px;" placeholder="Type a message..." />
+    <button onclick="sendMessage('${chatbot.connectionString}')" style="width: 18%; padding: 5px;">Send</button>
+  </div>
+</div>
+<script>
+  const messagesDiv = document.getElementById('messages');
+  function sendMessage(connectionString) {
+    const input = document.getElementById('input');
+    const message = input.value;
+    if (!message) return;
+    fetch('/api/chatbot/' + connectionString, { 
+      method: 'POST', 
+      body: JSON.stringify({ message }), 
+      headers: { 'Content-Type': 'application/json' } 
+    })
+    .then(res => res.json())
+    .then(data => {
+      messagesDiv.innerHTML += '<div style="background: ${chatbot.settings.userBubbleColor}; padding: 8px; margin: 4px 0; border-radius: 4px;">' + data.userMessage.content + '</div>';
+      messagesDiv.innerHTML += '<div style="background: ${chatbot.settings.aiBubbleColor}; padding: 8px; margin: 4px 0; border-radius: 4px;">' + data.aiMessage.content + '</div>';
+      input.value = '';
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
     });
-    
-    return json({ success: true });
-  } catch (error) {
-    console.error("Error updating settings:", error);
-    return json({ error: "Failed to update settings" }, { status: 500 });
   }
-};
+</script>
+`.trim(),
+        react: `
+import React, { useState, useEffect, useRef } from 'react';
 
-export default function CustomizeChatbot() {
-  const { chatbot, settings } = useLoaderData<typeof loader>();
-  const actionData = useActionData<typeof action>();
-  const navigation = useNavigation();
-  const isSubmitting = navigation.state === "submitting";
+const Chatbot = () => {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const messagesRef = useRef(null);
 
-  // State initialization with proper types
-  const [brandColor, setBrandColor] = useState(settings.brandColor);
-  const [chatBackground, setChatBackground] = useState(settings.chatBackground);
-  const [chatOpacity, setChatOpacity] = useState(settings.chatOpacity);
-  const [chatBorderRadius, setChatBorderRadius] = useState(settings.chatBorderRadius);
-  const [customLogo, setCustomLogo] = useState(settings.customLogo);
-  const [chatWidth, setChatWidth] = useState(settings.chatWidth);
-  const [chatHeight, setChatHeight] = useState(settings.chatHeight);
-  const [showEmailCapture, setShowEmailCapture] = useState(settings.showEmailCapture);
-  const [emailPlaceholder, setEmailPlaceholder] = useState(settings.emailPlaceholder);
-  const [quickReplies, setQuickReplies] = useState<QuickReply[]>(settings.quickReplies);
-  const [userBubbleColor, setUserBubbleColor] = useState(settings.userBubbleColor);
-  const [aiBubbleColor, setAiBubbleColor] = useState(settings.aiBubbleColor);
-  const [headingColor, setHeadingColor] = useState(settings.headingColor);
+  const sendMessage = async () => {
+    if (!input.trim()) return;
+    const res = await fetch('/api/chatbot/${chatbot.connectionString}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: input }),
+    });
+    const data = await res.json();
+    setMessages([...messages, data.userMessage, data.aiMessage]);
+    setInput('');
+  };
 
-  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setCustomLogo(reader.result as string);
-      reader.readAsDataURL(file);
+  useEffect(() => {
+    if (messagesRef.current) {
+      messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
     }
-  };
-
-  const addQuickReply = () => {
-    setQuickReplies([...quickReplies, { text: "", action: "" }]);
-  };
-
-  const removeQuickReply = (index: number) => {
-    setQuickReplies(quickReplies.filter((_, i) => i !== index));
-  };
-
-  const handleQuickReplyChange = (index: number, field: keyof QuickReply, value: string) => {
-    const newReplies = [...quickReplies];
-    newReplies[index] = { ...newReplies[index], [field]: value };
-    setQuickReplies(newReplies);
-  };
-
-  const defaultMessage = { 
-    content: "Hello! How can I help you today?", 
-    isUser: false, 
-    createdAt: new Date().toISOString() 
-  };
-  
-  const previewMessages = chatbot.conversations[0]?.messages || [defaultMessage];
+  }, [messages]);
 
   return (
-    <div className="min-h-screen bg-base-100 p-4 md:p-8">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6">Customize Chatbot: {chatbot.name}</h1>
-        
-        {actionData?.success && (
-          <div className="alert alert-success mb-4">Settings saved successfully!</div>
-        )}
-        {actionData?.error && (
-          <div className="alert alert-error mb-4">{actionData.error}</div>
-        )}
-
-        <Form method="post" className="space-y-6">
-          {/* Hidden inputs for form data */}
-          <input type="hidden" name="brandColor" value={brandColor} />
-          <input type="hidden" name="chatBackground" value={chatBackground} />
-          <input type="hidden" name="chatOpacity" value={chatOpacity.toString()} />
-          <input type="hidden" name="chatBorderRadius" value={chatBorderRadius.toString()} />
-          <input type="hidden" name="customLogo" value={customLogo || ""} />
-          <input type="hidden" name="chatWidth" value={chatWidth.toString()} />
-          <input type="hidden" name="chatHeight" value={chatHeight.toString()} />
-          <input type="hidden" name="showEmailCapture" value={showEmailCapture.toString()} />
-          <input type="hidden" name="emailPlaceholder" value={emailPlaceholder} />
-          <input type="hidden" name="quickReplies" value={JSON.stringify(quickReplies)} />
-          <input type="hidden" name="userBubbleColor" value={userBubbleColor} />
-          <input type="hidden" name="aiBubbleColor" value={aiBubbleColor} />
-          <input type="hidden" name="headingColor" value={headingColor} />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Brand Customization Section */}
-            <div className="card bg-base-100 p-6 shadow-sm">
-              <h2 className="text-xl font-semibold mb-4">Brand Customization</h2>
-              
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text">Brand Color</span>
-                </label>
-                <input
-                  type="color"
-                  value={brandColor}
-                  onChange={(e) => setBrandColor(e.target.value)}
-                  className="w-20 h-12 cursor-pointer rounded-lg"
-                />
-              </div>
-
-              <div className="form-control mt-4">
-                <label className="label">
-                  <span className="label-text">Upload Logo</span>
-                </label>
-                <div className="flex items-center gap-4">
-                  {customLogo && (
-                    <img
-                      src={customLogo}
-                      className="w-16 h-16 rounded-lg object-contain border border-base-300"
-                      alt="Custom logo"
-                    />
-                  )}
-                  <label className="btn btn-outline btn-sm cursor-pointer">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleLogoChange}
-                    />
-                    {customLogo ? "Change Logo" : "Upload Logo"}
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {/* Chat Appearance Section */}
-            <div className="card bg-base-100 p-6 shadow-sm">
-              <h2 className="text-xl font-semibold mb-4">Chat Appearance</h2>
-              
-              <div className="space-y-4">
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text">Chat Background</span>
-                  </label>
-                  <input
-                    type="color"
-                    value={chatBackground}
-                    onChange={(e) => setChatBackground(e.target.value)}
-                    className="w-20 h-12 cursor-pointer rounded-lg"
-                  />
-                </div>
-
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text">User Bubble Color</span>
-                  </label>
-                  <input
-                    type="color"
-                    value={userBubbleColor}
-                    onChange={(e) => setUserBubbleColor(e.target.value)}
-                    className="w-20 h-12 cursor-pointer rounded-lg"
-                  />
-                </div>
-
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text">AI Bubble Color</span>
-                  </label>
-                  <input
-                    type="color"
-                    value={aiBubbleColor}
-                    onChange={(e) => setAiBubbleColor(e.target.value)}
-                    className="w-20 h-12 cursor-pointer rounded-lg"
-                  />
-                </div>
-
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text">Heading Color</span>
-                  </label>
-                  <input
-                    type="color"
-                    value={headingColor}
-                    onChange={(e) => setHeadingColor(e.target.value)}
-                    className="w-20 h-12 cursor-pointer rounded-lg"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Dimensions & Style Section */}
-            <div className="card bg-base-100 p-6 shadow-sm">
-              <h2 className="text-xl font-semibold mb-4">Dimensions & Style</h2>
-              
-              <div className="space-y-4">
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text">Width (px)</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={chatWidth}
-                    onChange={(e) => setChatWidth(Number(e.target.value))}
-                    className="input input-bordered"
-                    min="200"
-                    max="800"
-                  />
-                </div>
-
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text">Height (px)</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={chatHeight}
-                    onChange={(e) => setChatHeight(Number(e.target.value))}
-                    className="input input-bordered"
-                    min="200"
-                    max="800"
-                  />
-                </div>
-
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text">Border Radius (px)</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={chatBorderRadius}
-                    onChange={(e) => setChatBorderRadius(Number(e.target.value))}
-                    className="input input-bordered"
-                    min="0"
-                    max="50"
-                  />
-                </div>
-
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text">Opacity</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={chatOpacity}
-                    onChange={(e) => setChatOpacity(Number(e.target.value))}
-                    className="input input-bordered"
-                    min="0"
-                    max="1"
-                    step="0.1"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Replies Section */}
-            <div className="card bg-base-100 p-6 shadow-sm">
-              <h2 className="text-xl font-semibold mb-4">Quick Replies</h2>
-              
-              <div className="space-y-3">
-                {quickReplies.map((reply, index) => (
-                  <div key={index} className="flex gap-2 items-center">
-                    <input
-                      type="text"
-                      value={reply.text}
-                      onChange={(e) => handleQuickReplyChange(index, 'text', e.target.value)}
-                      className="input input-bordered flex-1"
-                      placeholder="Button text"
-                    />
-                    <input
-                      type="text"
-                      value={reply.action}
-                      onChange={(e) => handleQuickReplyChange(index, 'action', e.target.value)}
-                      className="input input-bordered w-1/3"
-                      placeholder="Action"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeQuickReply(index)}
-                      className="btn btn-square btn-sm btn-error"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
-                
-                <button
-                  type="button"
-                  onClick={addQuickReply}
-                  className="btn btn-primary btn-sm mt-2"
-                >
-                  Add Quick Reply
-                </button>
-              </div>
-            </div>
+    <div style={{ width: '${chatbot.settings.chatWidth}px', height: '${chatbot.settings.chatHeight}px', background: '${chatbot.settings.chatBackground}', opacity: ${chatbot.settings.chatOpacity}, borderRadius: '${chatbot.settings.chatBorderRadius}px', position: 'fixed', bottom: '20px', right: '20px' }}>
+      <div style={{ background: '${chatbot.settings.brandColor}', color: '${chatbot.settings.headingColor}', padding: '10px', borderRadius: '${chatbot.settings.chatBorderRadius}px ${chatbot.settings.chatBorderRadius}px 0 0' }}>
+        ${chatbot.name}
+      </div>
+      <div ref={messagesRef} style={{ padding: '10px', height: '${chatbot.settings.chatHeight - 100}px', overflowY: 'auto' }}>
+        {messages.map((msg, i) => (
+          <div key={i} style={{ background: msg.role === 'user' ? '${chatbot.settings.userBubbleColor}' : '${chatbot.settings.aiBubbleColor}', padding: '8px', margin: '4px 0', borderRadius: '4px' }}>
+            {msg.content}
           </div>
-
-          {/* Preview Section */}
-          <div className="card bg-base-100 p-6 shadow-sm mt-6">
-            <h2 className="text-xl font-semibold mb-4">Live Preview</h2>
-            // In chatToggler.tsx
-<ChatPreview 
-  settings={{
-    chatWidth: 400,  // Add default value
-    chatHeight: 600, // Add default value
-    chatBackground: '#ffffff',
-    chatOpacity: 1,
-    chatBorderRadius: 8,
-    brandColor: '#2563eb',
-    customLogo: undefined,
-    showEmailCapture: false,
-    emailPlaceholder: '',
-    quickReplies: [],
-    userBubbleColor: '#e0e0e0', // Add missing property
-    aiBubbleColor: '#2563eb',    // Add missing property
-    headingColor: '#000000'
-  }}
-  messages={[]}
-  onSendMessage={() => {}}
-/>
-          </div>
-
-          {/* Submit Button */}
-          <div className="flex justify-end mt-6">
-            <button
-              type="submit"
-              className="btn btn-primary gap-2"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Saving..." : "Save Changes"}
-              {isSubmitting && (
-                <span className="loading loading-spinner loading-sm"></span>
-              )}
-            </button>
-          </div>
-        </Form>
+        ))}
+      </div>
+      <div style={{ padding: '10px', borderTop: '1px solid #ccc', display: 'flex', gap: '5px' }}>
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+          style={{ width: '80%', padding: '5px' }}
+          placeholder="Type a message..."
+        />
+        <button onClick={sendMessage} style={{ width: '18%', padding: '5px' }}>Send</button>
       </div>
     </div>
   );
-}// app/routes/_404.tsx
+};
+
+export default Chatbot;
+`.trim(),
+      }
+    : { vanillaJs: "", react: "" };
+
+  return json<LoaderData>({
+    chatbot,
+    messageCount,
+    codeSnippets,
+    metrics: { totalMessages: messageCount, totalConversations, usage },
+  });
+};
+
+export const action: ActionFunction = async ({ request, params }) => {
+  const session = await getKindeSession(request);
+  const user = await session.getUser();
+  if (!user) return json({ error: "Unauthorized" }, { status: 401 });
+
+  const messageCount = await prisma.message.count({
+    where: { conversation: { chatbotId: params.id } },
+  });
+
+  const { success } = await checkRateLimit(user.id);
+  if (!success || messageCount >= 10) {
+    return redirect("/checkout");
+  }
+
+  const formData = await request.formData();
+  const message = formData.get("message") as string;
+  const conversationId = formData.get("conversationId") as string;
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    include: { messages: true },
+  });
+  if (!conversation)
+    return json({ error: "Conversation not found" }, { status: 404 });
+
+  const userMessage = await prisma.message.create({
+    data: { conversationId, content: message, role: "user" },
+  });
+
+  await trackUsage(params.id!, user.id);
+
+  // Prepare a context string from the conversation messages
+  const context = conversation.messages.map((m) => `${m.role}: ${m.content}`).join("\n");
+  const response = await generateResponse(message, context);
+
+  const aiMessage = await prisma.message.create({
+    data: { conversationId, content: response, role: "assistant" },
+  });
+
+  return json<ActionData>({
+    userMessage: { ...userMessage, role: "user" as const },
+    aiMessage: { ...aiMessage, role: "assistant" as const },
+  });
+};
+
+export default function ChatbotPage() {
+  const { chatbot, messageCount, codeSnippets, metrics } = useLoaderData<LoaderData>();
+  const fetcher = useFetcher<ActionData>();
+  const [messages, setMessages] = useState<Message[]>(chatbot.conversations[0]?.messages || []);
+  const [activeTab, setActiveTab] = useState<"vanillaJs" | "react">("vanillaJs");
+
+  const handleSendMessage = (msg: string) => {
+    if (!msg.trim()) return;
+    const formData = new FormData();
+    formData.append("message", msg);
+    formData.append("conversationId", chatbot.conversations[0]?.id || "");
+    fetcher.submit(formData, { method: "post" });
+  };
+
+  useEffect(() => {
+    const data = fetcher.data;
+    if (data && "userMessage" in data && "aiMessage" in data && data.userMessage && data.aiMessage) {
+      setMessages((prev) => [...prev, data.userMessage!, data.aiMessage!]);
+    }
+  }, [fetcher.data]);
+
+  const chartData = {
+    labels: metrics.usage.map((u) => u.date),
+    datasets: [
+      {
+        label: "Messages",
+        data: metrics.usage.map((u) => u.messages),
+        borderColor: "#2563eb",
+        backgroundColor: "rgba(37, 99, 235, 0.2)",
+        fill: true,
+      },
+    ],
+  };
+
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: { position: "top" as const },
+      title: { display: true, text: "Message Activity (Last 7 Days)" },
+    },
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-white">
+      <div className="max-w-6xl mx-auto p-8 space-y-8">
+        <h1 className="text-3xl font-bold">{chatbot.name}</h1>
+
+        {/* Metrics Section */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-gray-800 p-4 rounded-lg shadow">
+            <p className="text-sm text-gray-400">Total Messages</p>
+            <p className="text-2xl font-bold">{metrics.totalMessages}</p>
+          </div>
+          <div className="bg-gray-800 p-4 rounded-lg shadow">
+            <p className="text-sm text-gray-400">Conversations</p>
+            <p className="text-2xl font-bold">{metrics.totalConversations}</p>
+          </div>
+          <div className="bg-gray-800 p-4 rounded-lg shadow">
+            <p className="text-sm text-gray-400">Messages Used</p>
+            <p className="text-2xl font-bold">{messageCount}/10</p>
+          </div>
+        </div>
+
+        {/* Chart Section */}
+        <div className="bg-gray-800 p-6 rounded-lg shadow">
+          <Line data={chartData} options={chartOptions} />
+        </div>
+
+        {/* Chat Preview */}
+        <div className="bg-gray-800 p-6 rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-4">Chat Preview</h2>
+          <ChatToggler
+            settings={chatbot.settings!}
+            messages={messages}
+            onSendMessage={handleSendMessage}
+            isLoading={fetcher.state === "submitting"}
+          />
+        </div>
+
+        {/* Code Snippets */}
+        <div className="bg-gray-800 p-6 rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-4">Embed Code</h2>
+          <div className="tabs tabs-bordered mb-4">
+            <button
+              className={`tab ${activeTab === "vanillaJs" ? "tab-active" : ""}`}
+              onClick={() => setActiveTab("vanillaJs")}
+            >
+              Vanilla JS
+            </button>
+            <button
+              className={`tab ${activeTab === "react" ? "tab-active" : ""}`}
+              onClick={() => setActiveTab("react")}
+            >
+              React
+            </button>
+          </div>
+          <pre className="bg-gray-900 p-4 rounded-lg text-sm overflow-x-auto">
+            <code>{codeSnippets[activeTab]}</code>
+          </pre>
+          <button
+            onClick={() => navigator.clipboard.writeText(codeSnippets[activeTab])}
+            className="btn btn-outline mt-4"
+          >
+            Copy {activeTab === "vanillaJs" ? "Vanilla JS" : "React"} Code
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+// app/routes/_404.tsx
 import { Link, useRouteError } from "@remix-run/react";
 import type { ErrorResponse } from "@remix-run/node";
 
@@ -1238,25 +1122,26 @@ const Pricing = () => {
   );
 };
 
-export default Pricing;// app/routes/chatbot.new.tsx
-import { useState } from "react";
+export default Pricing;import { useState } from "react";
 import { Form, useNavigation, redirect, useActionData } from "@remix-run/react";
 import { LoaderFunctionArgs, json, ActionFunction } from "@remix-run/node";
 import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
 import prisma from "~/utils/prisma.server";
 import { v4 as uuidv4 } from "uuid";
 import { ChatPreview } from "~/components/chatPreview";
-import { Trash2 } from "lucide-react";
+
+import { Logger } from "~/utils/logger.server";
+import { ChatSettings } from "~/types/types";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { isAuthenticated } = await getKindeSession(request);
-  if (!(await isAuthenticated())) throw redirect("/login");
+  const { isAuthenticated, getUser } = await getKindeSession(request);
+  if (!(await isAuthenticated()) || !getUser()) throw redirect("/login");
   return json({});
 };
 
 export const action: ActionFunction = async ({ request }) => {
-  const session = await getKindeSession(request);
-  const user = await session.getUser();
+  const { getUser } = await getKindeSession(request);
+  const user = await getUser();
   if (!user) return json({ error: "Unauthorized" }, { status: 401 });
 
   const formData = await request.formData();
@@ -1265,17 +1150,11 @@ export const action: ActionFunction = async ({ request }) => {
   const initialMessage = formData.get("initialMessage") as string || "Hello! How can I help you today?";
   const customLogo = formData.get("customLogo") as string | null;
   const quickRepliesRaw = formData.get("quickReplies") as string;
-  const quickReplies: { text: string; action: string }[] = quickRepliesRaw ? JSON.parse(quickRepliesRaw) : [];
+  const quickReplies = quickRepliesRaw ? JSON.parse(quickRepliesRaw) : [];
 
   if (!name) return json({ error: "Name is required" }, { status: 400 });
 
   try {
-    await prisma.user.upsert({
-      where: { kindeId: user.id },
-      create: { kindeId: user.id, email: user.email!, name: user.given_name || user.email || "Unnamed User" },
-      update: { email: user.email!, name: user.given_name || user.email || "Unnamed User" },
-    });
-
     const chatbot = await prisma.chatbot.create({
       data: {
         name,
@@ -1283,13 +1162,14 @@ export const action: ActionFunction = async ({ request }) => {
         userId: user.id,
         settings: {
           create: {
+             
             brandColor,
             customLogo: customLogo || null,
             chatBackground: "#ffffff",
             chatOpacity: 1.0,
             chatBorderRadius: 8,
-            chatWidth: 300,
-            chatHeight: 400,
+            chatWidth: 400,
+            chatHeight: 600,
             showEmailCapture: false,
             emailPlaceholder: "Enter your email",
             quickReplies,
@@ -1304,10 +1184,16 @@ export const action: ActionFunction = async ({ request }) => {
       },
     });
 
+    await prisma.chatSettings.update({
+      where: { chatbotId: "temp-id" },
+      data: { chatbotId: chatbot.id },
+    });
+
+    Logger.info("Chatbot created", { chatbotId: chatbot.id });
     return redirect("/dashboard");
   } catch (error) {
-    console.error("Error creating chatbot:", error);
-    return json({ error: "Failed to create chatbot. Check server logs." }, { status: 500 });
+    Logger.error("Error creating chatbot", { error });
+    return json({ error: "Failed to create chatbot" }, { status: 500 });
   }
 };
 
@@ -1319,7 +1205,7 @@ export default function NewChatbot() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [initialMessage, setInitialMessage] = useState("Hello! How can I help you today?");
-  const [quickReplies, setQuickReplies] = useState<{ text: string; action: string }[]>([]);
+  const [quickReplies, setQuickReplies] = useState<Array<{ text: string; action: string }>>([]);
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1332,150 +1218,155 @@ export default function NewChatbot() {
 
   const addQuickReply = () => setQuickReplies([...quickReplies, { text: "", action: "" }]);
   const removeQuickReply = (index: number) => setQuickReplies(quickReplies.filter((_, i) => i !== index));
-  const handleQuickReplyChange = (index: number, field: "text" | "action", value: string) => {
+  const handleQuickReplyChange = (index: number, field: keyof { text: string; action: string }, value: string) => {
     const newReplies = [...quickReplies];
     newReplies[index][field] = value;
     setQuickReplies(newReplies);
   };
 
-  const handleSubmit = () => {
-    if (!actionData?.error) {
-      setName("");
-      setBrandColor("#2563eb");
-      setLogoPreview(null);
-      setInitialMessage("Hello! How can I help you today?");
-      setQuickReplies([]);
-    }
+  const previewSettings: ChatSettings = {
+    chatbotId: "preview-id",
+    chatWidth: 400,
+    chatHeight: 600,
+    chatBackground: "#ffffff",
+    chatOpacity: 1.0,
+    chatBorderRadius: 8,
+    brandColor,
+    customLogo: logoPreview || null,
+    showEmailCapture: false,
+    emailPlaceholder: "Enter your email",
+    quickReplies,
+    userBubbleColor: "#e0e0e0",
+    aiBubbleColor: "#2563eb",
+    headingColor: "#000000",
   };
 
   return (
-    <div className="min-h-screen bg-base-100 p-4 md:p-8">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">Create New Chatbot</h1>
+    <div className="min-h-screen bg-gray-900 text-white">
+     
+      <div className="max-w-5xl mx-auto p-8">
+        <h1 className="text-3xl font-bold mb-6">Create New Chatbot</h1>
         {actionData?.error && <div className="alert alert-error mb-4">{actionData.error}</div>}
-        <Form method="post" className="space-y-6" encType="multipart/form-data" onSubmit={handleSubmit}>
+        <Form method="post" className="space-y-6" encType="multipart/form-data">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="card bg-base-100 p-6 shadow-sm">
+            <div className="bg-gray-800 p-6 rounded-lg shadow">
               <h2 className="text-xl font-semibold mb-4">Basic Information</h2>
-              <div className="form-control">
-                <label className="label"><span className="label-text">Chatbot Name</span></label>
-                <input
-                  type="text"
-                  name="name"
-                  placeholder="My Awesome Chatbot"
-                  className="input input-bordered"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="form-control mt-4">
-                <label className="label"><span className="label-text">Brand Color</span></label>
-                <input
-                  type="color"
-                  name="brandColor"
-                  value={brandColor}
-                  onChange={(e) => setBrandColor(e.target.value)}
-                  className="w-20 h-12 cursor-pointer"
-                />
-              </div>
-              <div className="form-control mt-4">
-                <label className="label"><span className="label-text">Upload Logo</span></label>
-                <div className="flex items-center gap-4">
-                  {logoPreview && <img src={logoPreview} className="w-16 h-16 rounded-lg object-contain" />}
-                  <label className="btn btn-outline btn-sm cursor-pointer">
-                    <input type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
-                    {logoPreview ? "Change Logo" : "Upload Logo"}
-                  </label>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm">Chatbot Name</label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="input input-bordered w-full"
+                    required
+                  />
                 </div>
-                <input type="hidden" name="customLogo" value={logoPreview || ""} />
+                <div>
+                  <label className="block text-sm">Brand Color</label>
+                  <input
+                    type="color"
+                    name="brandColor"
+                    value={brandColor}
+                    onChange={(e) => setBrandColor(e.target.value)}
+                    className="w-20 h-12"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm">Logo</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoChange}
+                    className="file-input file-input-bordered w-full"
+                  />
+                  {logoPreview && <img src={logoPreview} alt="Preview" className="mt-2 w-16 h-16 rounded" />}
+                  <input type="hidden" name="customLogo" value={logoPreview || ""} />
+                </div>
               </div>
             </div>
-
-            <div className="card bg-base-100 p-6 shadow-sm">
-              <h2 className="text-xl font-semibold mb-4">Initial Configuration</h2>
-              <div className="form-control">
-                <label className="label"><span className="label-text">Welcome Message</span></label>
-                <textarea
-                  name="initialMessage"
-                  className="textarea textarea-bordered h-32"
-                  placeholder="Enter initial greeting message..."
-                  value={initialMessage}
-                  onChange={(e) => setInitialMessage(e.target.value)}
-                />
-              </div>
-              <div className="form-control mt-4">
-                <h3 className="text-lg font-semibold mb-2">Quick Replies</h3>
-                {quickReplies.map((reply, index) => (
-                  <div key={index} className="flex gap-2 items-center mb-2">
-                    <input
-                      type="text"
-                      value={reply.text}
-                      onChange={(e) => handleQuickReplyChange(index, "text", e.target.value)}
-                      className="input input-bordered flex-1"
-                      placeholder="Button text"
-                    />
-                    <input
-                      type="text"
-                      value={reply.action}
-                      onChange={(e) => handleQuickReplyChange(index, "action", e.target.value)}
-                      className="input input-bordered w-1/3"
-                      placeholder="Action (optional)"
-                    />
-                    <button type="button" onClick={() => removeQuickReply(index)} className="btn btn-square btn-sm btn-error">
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
-                <button type="button" onClick={addQuickReply} className="btn btn-primary btn-sm mt-2">
-                  Add Quick Reply
-                </button>
-                <input type="hidden" name="quickReplies" value={JSON.stringify(quickReplies)} />
+            <div className="bg-gray-800 p-6 rounded-lg shadow">
+              <h2 className="text-xl font-semibold mb-4">Initial Setup</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm">Welcome Message</label>
+                  <textarea
+                    name="initialMessage"
+                    value={initialMessage}
+                    onChange={(e) => setInitialMessage(e.target.value)}
+                    className="textarea textarea-bordered w-full h-24"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm">Quick Replies</label>
+                  {quickReplies.map((reply, index) => (
+                    <div key={index} className="flex gap-2 mb-2">
+                      <input
+                        type="text"
+                        value={reply.text}
+                        onChange={(e) => handleQuickReplyChange(index, "text", e.target.value)}
+                        className="input input-bordered flex-1"
+                        placeholder="Text"
+                      />
+                      <input
+                        type="text"
+                        value={reply.action}
+                        onChange={(e) => handleQuickReplyChange(index, "action", e.target.value)}
+                        className="input input-bordered w-1/3"
+                        placeholder="Action"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeQuickReply(index)}
+                        className="btn btn-error btn-sm"
+                      >
+                        X
+                      </button>
+                    </div>
+                  ))}
+                  <button type="button" onClick={addQuickReply} className="btn btn-primary btn-sm mt-2">
+                    Add Reply
+                  </button>
+                  <input type="hidden" name="quickReplies" value={JSON.stringify(quickReplies)} />
+                </div>
               </div>
             </div>
           </div>
-
-          <div className="card bg-base-100 p-6 shadow-sm">
+          <div className="bg-gray-800 p-6 rounded-lg shadow">
             <h2 className="text-xl font-semibold mb-4">Preview</h2>
             <ChatPreview
-              messages={[{ content: initialMessage, isUser: false, createdAt: new Date().toISOString() }]}
+              messages={[{ id: "preview", content: initialMessage, role: "system", createdAt: new Date() }]}
               onSendMessage={() => {}}
-              settings={{
-                chatWidth: 300,
-                chatHeight: 400,
-                chatBackground: "#ffffff",
-                chatOpacity: 1.0,
-                chatBorderRadius: 8,
-                brandColor,
-                customLogo: logoPreview || null,
-                showEmailCapture: false,
-                emailPlaceholder: "Enter your email",
-                quickReplies,
-                userBubbleColor: "#e0e0e0",
-                aiBubbleColor: "#2563eb",
-                headingColor: "#000000",
-                capturedEmail: "",
-                onEmailCapture: () => {},
-              }}
+              settings={previewSettings}
             />
           </div>
-
-          <div className="flex justify-end gap-4">
-            <button type="submit" className="btn btn-primary gap-2" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <span className="loading loading-spinner"></span>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M19 11h-6V5h-2v6H5v2h6v6h2v-6h6z" />
-                </svg>
-              )}
-              Create Chatbot
+          <div className="flex justify-end">
+            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+              {isSubmitting ? "Creating..." : "Create Chatbot"}
             </button>
           </div>
         </Form>
       </div>
     </div>
   );
+}// app/routes/logout.tsx (create if it doesn’t exist)
+import { redirect, ActionFunction } from "@remix-run/node";
+import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
+import { Logger } from "~/utils/logger.server";
+
+export const action: ActionFunction = async ({ request }) => {
+  const { logout } = await getKindeSession(request);
+  await logout();
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("user");
+  }
+  Logger.info("User logged out and local storage cleared");
+  return redirect("/");
+};
+
+export default function Logout() {
+  return null; // This route only handles the action
 }import React from "react";
 import ReactMarkdown from "react-markdown";
 
@@ -1598,62 +1489,213 @@ Visit [Support Page](https://support.yourdomain.com) for help.
 };
 
 export default DocumentationPage;// app/routes/chatbot.$id.tsx
-import { json, redirect } from "@remix-run/node";
-import type { ActionFunction, LoaderFunction } from "@remix-run/node";
-import { useLoaderData, Form, useActionData, useNavigation } from "@remix-run/react";
+import { json, redirect, LoaderFunction, ActionFunction } from "@remix-run/node";
+import { useLoaderData, useFetcher } from "@remix-run/react";
+import { useState, useEffect } from "react";
 import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
 import prisma from "~/utils/prisma.server";
-import { ChatPreview } from "~/components/chatPreview";
-import { useState } from "react";
-import { Trash2 } from "lucide-react";
+import { ChatToggler } from "~/components/chatToggler";
 
-// LangChain and Astra DB imports
-import { AstraDBVectorStore } from "@langchain/community/vectorstores/astradb";
-import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { RunnableSequence } from "@langchain/core/runnables";
-import { StringOutputParser } from "@langchain/core/output_parsers";
-import { PromptTemplate } from "@langchain/core/prompts";
-import { TaskType } from "@google/generative-ai";
+import { generateResponse } from "~/utils/gemini.server";
+import { checkRateLimit, trackUsage } from "~/utils/usage.server";
+import { Chatbot, Message } from "~/types/types";
 
-// Read configuration from environment variables
-const token = process.env.ASTRA_DB_APPLICATION_TOKEN!;
-const endpoint = process.env.ASTRA_DB_ENDPOINT!;
-const collection = process.env.ASTRA_DB_COLLECTION!;
+import { Line } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
 
-const embeddings = new GoogleGenerativeAIEmbeddings({
-  modelName: "text-embedding-004", // 768 dimensions
-  taskType: TaskType.RETRIEVAL_DOCUMENT,
-  title: "Document title",
-});
+// Register Chart.js components
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
-const llm = new ChatGoogleGenerativeAI({
-  apiKey: process.env.GEMINI_API_KEY!,
-  model: "gemini-1.5-pro",
-  temperature: 0,
-  maxRetries: 2,
-});
+interface LoaderData {
+  chatbot: Chatbot;
+  messageCount: number;
+  codeSnippets: { vanillaJs: string; react: string };
+  metrics: {
+    totalMessages: number;
+    totalConversations: number;
+    usage: Array<{ date: string; messages: number }>;
+  };
+}
+
+interface ActionData {
+  userMessage?: Message;
+  aiMessage?: Message;
+  error?: string;
+}
 
 export const loader: LoaderFunction = async ({ request, params }) => {
   const session = await getKindeSession(request);
   const user = await session.getUser();
-  if (!user) return json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) throw redirect("/login");
 
-  const chatbot = await prisma.chatbot.findFirst({
+  // Fetch the chatbot and include its settings and conversations with messages (ordered chronologically)
+  const chatbotRaw = await prisma.chatbot.findFirst({
     where: { id: params.id, userId: user.id },
-    include: { 
-      settings: true, 
-      conversations: { include: { messages: true } } 
+    include: {
+      settings: true,
+      conversations: { include: { messages: { orderBy: { createdAt: "asc" } } } },
     },
   });
 
-  if (!chatbot) return json({ error: "Chatbot not found" }, { status: 404 });
+  if (!chatbotRaw) throw json({ error: "Chatbot not found" }, { status: 404 });
 
+  // Transform the raw data into our type-safe Chatbot type.
+  const chatbot: Chatbot = {
+    ...chatbotRaw,
+    createdAt: chatbotRaw.createdAt || new Date(),
+    settings: chatbotRaw.settings
+      ? {
+          ...chatbotRaw.settings,
+          quickReplies: Array.isArray(chatbotRaw.settings.quickReplies)
+            ? (chatbotRaw.settings.quickReplies as { text: string; action: string }[])
+            : [],
+        }
+      : null,
+    conversations: chatbotRaw.conversations.map((conv) => ({
+      id: conv.id,
+      messages: conv.messages.map((msg) => ({
+        id: msg.id,
+        content: msg.content,
+        role: msg.role as "user" | "assistant" | "system",
+        createdAt: msg.createdAt,
+      })),
+    })),
+  };
+
+  // Count total messages (across all conversations) for metrics
   const messageCount = await prisma.message.count({
-    where: { conversation: { chatbotId: params.id, chatbot: { userId: user.id } } },
+    where: { conversation: { chatbotId: params.id } },
   });
+  const totalConversations = chatbot.conversations.length;
 
-  return json({ chatbot, messageCount });
+  // Get usage for the last 7 days
+  const usage = await Promise.all(
+    Array.from({ length: 7 }, (_, i) => {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split("T")[0];
+      return prisma.message
+        .count({
+          where: {
+            conversation: { chatbotId: params.id },
+            createdAt: {
+              gte: new Date(dateStr),
+              lte: new Date(dateStr + "T23:59:59"),
+            },
+          },
+        })
+        .then((messages) => ({ date: dateStr, messages }));
+    })
+  ).then((results) => results.reverse());
+
+  // Build dynamic code snippets for embedding (Vanilla JS and React)
+  const codeSnippets = chatbot.settings
+    ? {
+        vanillaJs: `
+<div id="chatbot" style="width: ${chatbot.settings.chatWidth}px; height: ${chatbot.settings.chatHeight}px; background: ${chatbot.settings.chatBackground}; opacity: ${chatbot.settings.chatOpacity}; border-radius: ${chatbot.settings.chatBorderRadius}px; position: fixed; bottom: 20px; right: 20px;">
+  <div style="background: ${chatbot.settings.brandColor}; color: ${chatbot.settings.headingColor}; padding: 10px; border-radius: ${chatbot.settings.chatBorderRadius}px ${chatbot.settings.chatBorderRadius}px 0 0;">
+    ${chatbot.name}
+  </div>
+  <div id="messages" style="padding: 10px; height: ${chatbot.settings.chatHeight - 100}px; overflow-y: auto;"></div>
+  <div style="padding: 10px; border-top: 1px solid #ccc;">
+    <input id="input" type="text" style="width: 80%; padding: 5px;" placeholder="Type a message..." />
+    <button onclick="sendMessage('${chatbot.connectionString}')" style="width: 18%; padding: 5px;">Send</button>
+  </div>
+</div>
+<script>
+  const messagesDiv = document.getElementById('messages');
+  function sendMessage(connectionString) {
+    const input = document.getElementById('input');
+    const message = input.value;
+    if (!message) return;
+    fetch('/api/chatbot/' + connectionString, { 
+      method: 'POST', 
+      body: JSON.stringify({ message }), 
+      headers: { 'Content-Type': 'application/json' } 
+    })
+    .then(res => res.json())
+    .then(data => {
+      messagesDiv.innerHTML += '<div style="background: ${chatbot.settings.userBubbleColor}; padding: 8px; margin: 4px 0; border-radius: 4px;">' + data.userMessage.content + '</div>';
+      messagesDiv.innerHTML += '<div style="background: ${chatbot.settings.aiBubbleColor}; padding: 8px; margin: 4px 0; border-radius: 4px;">' + data.aiMessage.content + '</div>';
+      input.value = '';
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    });
+  }
+</script>
+`.trim(),
+        react: `
+import React, { useState, useEffect, useRef } from 'react';
+
+const Chatbot = () => {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const messagesRef = useRef(null);
+
+  const sendMessage = async () => {
+    if (!input.trim()) return;
+    const res = await fetch('/api/chatbot/${chatbot.connectionString}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: input }),
+    });
+    const data = await res.json();
+    setMessages([...messages, data.userMessage, data.aiMessage]);
+    setInput('');
+  };
+
+  useEffect(() => {
+    if (messagesRef.current) {
+      messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  return (
+    <div style={{ width: '${chatbot.settings.chatWidth}px', height: '${chatbot.settings.chatHeight}px', background: '${chatbot.settings.chatBackground}', opacity: ${chatbot.settings.chatOpacity}, borderRadius: '${chatbot.settings.chatBorderRadius}px', position: 'fixed', bottom: '20px', right: '20px' }}>
+      <div style={{ background: '${chatbot.settings.brandColor}', color: '${chatbot.settings.headingColor}', padding: '10px', borderRadius: '${chatbot.settings.chatBorderRadius}px ${chatbot.settings.chatBorderRadius}px 0 0' }}>
+        ${chatbot.name}
+      </div>
+      <div ref={messagesRef} style={{ padding: '10px', height: '${chatbot.settings.chatHeight - 100}px', overflowY: 'auto' }}>
+        {messages.map((msg, i) => (
+          <div key={i} style={{ background: msg.role === 'user' ? '${chatbot.settings.userBubbleColor}' : '${chatbot.settings.aiBubbleColor}', padding: '8px', margin: '4px 0', borderRadius: '4px' }}>
+            {msg.content}
+          </div>
+        ))}
+      </div>
+      <div style={{ padding: '10px', borderTop: '1px solid #ccc', display: 'flex', gap: '5px' }}>
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+          style={{ width: '80%', padding: '5px' }}
+          placeholder="Type a message..."
+        />
+        <button onClick={sendMessage} style={{ width: '18%', padding: '5px' }}>Send</button>
+      </div>
+    </div>
+  );
+};
+
+export default Chatbot;
+`.trim(),
+      }
+    : { vanillaJs: "", react: "" };
+
+  return json<LoaderData>({
+    chatbot,
+    messageCount,
+    codeSnippets,
+    metrics: { totalMessages: messageCount, totalConversations, usage },
+  });
 };
 
 export const action: ActionFunction = async ({ request, params }) => {
@@ -1662,216 +1704,160 @@ export const action: ActionFunction = async ({ request, params }) => {
   if (!user) return json({ error: "Unauthorized" }, { status: 401 });
 
   const messageCount = await prisma.message.count({
-    where: { conversation: { chatbotId: params.id, chatbot: { userId: user.id } } },
+    where: { conversation: { chatbotId: params.id } },
   });
 
-  if (messageCount >= 10) {
-    return redirect("/payment");
+  const { success } = await checkRateLimit(user.id);
+  if (!success || messageCount >= 10) {
+    return redirect("/checkout");
   }
 
   const formData = await request.formData();
-  const actionType = formData.get("action");
+  const message = formData.get("message") as string;
+  const conversationId = formData.get("conversationId") as string;
 
-  switch (actionType) {
-    case "sendMessage": {
-      const message = formData.get("message") as string;
-      const conversationId = formData.get("conversationId") as string;
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    include: { messages: true },
+  });
+  if (!conversation)
+    return json({ error: "Conversation not found" }, { status: 404 });
 
-      const conversation = await prisma.conversation.findUnique({
-        where: { id: conversationId },
-        include: { messages: true },
-      });
-      if (!conversation)
-        return json({ error: "Conversation not found" }, { status: 404 });
+  const userMessage = await prisma.message.create({
+    data: { conversationId, content: message, role: "user" },
+  });
 
-      // Save the user's message
-      const userMessage = await prisma.message.create({
-        data: { conversationId, content: message, role: "user" },
-      });
+  await trackUsage(params.id!, user.id);
 
-      // --- RAG using LangChain and Astra DB ---
-      // Instantiate the vector store using the official fromExistingIndex method
-      const vectorStore = await AstraDBVectorStore.fromExistingIndex(embeddings, {
-        token,
-        endpoint,
-        collection,
-        collectionOptions: {
-          vector: {
-            dimension: 768,
-            metric: "cosine",
-          },
-        },
-      });
+  // Prepare a context string from the conversation messages
+  const context = conversation.messages.map((m) => `${m.role}: ${m.content}`).join("\n");
+  const response = await generateResponse(message, context);
 
-      const retriever = vectorStore.asRetriever();
-      const docs = await retriever.getRelevantDocuments(message);
-      const context = docs.map((doc) => doc.pageContent).join("\n");
+  const aiMessage = await prisma.message.create({
+    data: { conversationId, content: response, role: "assistant" },
+  });
 
-      const prompt = PromptTemplate.fromTemplate(
-        "Answer based on the following context:\n{context}\n\nQuestion: {question}"
-      );
-
-      const chain = RunnableSequence.from([
-        prompt,
-        llm,
-        new StringOutputParser(),
-      ]);
-
-      const response = await chain.invoke({ context, question: message });
-
-      // Save the AI's response
-      const aiMessage = await prisma.message.create({
-        data: { conversationId, content: response, role: "assistant" },
-      });
-
-      return json({ userMessage, aiMessage });
-    }
-    default:
-      return json({ error: "Invalid action" }, { status: 400 });
-  }
+  return json<ActionData>({
+    userMessage: { ...userMessage, role: "user" as const },
+    aiMessage: { ...aiMessage, role: "assistant" as const },
+  });
 };
 
 export default function ChatbotPage() {
-  const { chatbot, messageCount } = useLoaderData<typeof loader>();
-  const actionData = useActionData<typeof action>();
-  const navigation = useNavigation();
-  const isSubmitting = navigation.state === "submitting";
-  const [message, setMessage] = useState("");
-  const [showPreview, setShowPreview] = useState(true);
+  const { chatbot, messageCount, codeSnippets, metrics } = useLoaderData<LoaderData>();
+  const fetcher = useFetcher<ActionData>();
+  const [messages, setMessages] = useState<Message[]>(chatbot.conversations[0]?.messages || []);
+  const [activeTab, setActiveTab] = useState<"vanillaJs" | "react">("vanillaJs");
 
-  if ("error" in chatbot) {
-    return (
-      <div className="min-h-screen bg-base-100 flex items-center justify-center">
-        <div className="alert alert-error">
-          <span>{chatbot.error}</span>
-        </div>
-      </div>
-    );
-  }
-
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!message.trim()) return;
-    setMessage("");
+  const handleSendMessage = (msg: string) => {
+    if (!msg.trim()) return;
+    const formData = new FormData();
+    formData.append("message", msg);
+    formData.append("conversationId", chatbot.conversations[0]?.id || "");
+    fetcher.submit(formData, { method: "post" });
   };
 
-  const codeSnippet = `
-    <div id="chatbot" style="width: ${chatbot.settings.chatWidth}px; height: ${chatbot.settings.chatHeight}px; background: ${chatbot.settings.chatBackground}; opacity: ${chatbot.settings.chatOpacity}; border-radius: ${chatbot.settings.chatBorderRadius}px;">
-      <div style="background: ${chatbot.settings.brandColor}; color: ${chatbot.settings.headingColor}; padding: 10px; border-radius: ${chatbot.settings.chatBorderRadius}px ${chatbot.settings.chatBorderRadius}px 0 0;">
-        ${chatbot.name}
-      </div>
-      <div style="padding: 10px;">
-        ${chatbot.conversations[0]?.messages.map((msg: { role: string; content: any; }) => `
-          <div style="background: ${msg.role === 'user' ? chatbot.settings.userBubbleColor : chatbot.settings.aiBubbleColor}; padding: 8px; margin: 4px 0; border-radius: 4px;">
-            ${msg.content}
-          </div>
-        `).join('')}
-      </div>
-      ${chatbot.settings.quickReplies.length > 0 ? `
-        <div style="padding: 10px;">
-          ${chatbot.settings.quickReplies.map((reply: { text: any; }) => `
-            <button style="background: ${chatbot.settings.brandColor}; color: white; padding: 6px 12px; margin: 4px; border-radius: 4px;">
-              ${reply.text}
-            </button>
-          `).join('')}
-        </div>
-      ` : ''}
-    </div>
-  `;
+  useEffect(() => {
+    const data = fetcher.data;
+    if (data && "userMessage" in data && "aiMessage" in data && data.userMessage && data.aiMessage) {
+      setMessages((prev) => [...prev, data.userMessage!, data.aiMessage!]);
+    }
+  }, [fetcher.data]);
+
+  const chartData = {
+    labels: metrics.usage.map((u) => u.date),
+    datasets: [
+      {
+        label: "Messages",
+        data: metrics.usage.map((u) => u.messages),
+        borderColor: "#2563eb",
+        backgroundColor: "rgba(37, 99, 235, 0.2)",
+        fill: true,
+      },
+    ],
+  };
+
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: { position: "top" as const },
+      title: { display: true, text: "Message Activity (Last 7 Days)" },
+    },
+  };
 
   return (
-    <div className="min-h-screen bg-base-100 p-4 md:p-8">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6">{chatbot.name}</h1>
-        <div className="flex justify-between items-center mb-4">
-          <button onClick={() => setShowPreview(!showPreview)} className="btn btn-outline">
-            {showPreview ? "Hide Preview" : "Show Preview"}
-          </button>
-          <span className="text-sm">Messages Used: {messageCount}/10</span>
-        </div>
+    <div className="min-h-screen bg-gray-900 text-white">
+      <div className="max-w-6xl mx-auto p-8 space-y-8">
+        <h1 className="text-3xl font-bold">{chatbot.name}</h1>
 
-        {showPreview && (
-          <div className="card bg-base-100 shadow-sm mb-6">
-            <div className="card-body">
-              <h2 className="text-xl font-semibold mb-4">Chat Preview</h2>
-              <ChatPreview
-                messages={
-                  chatbot.conversations[0]?.messages.map((msg: { createdAt: any; }) => ({
-                    ...msg,
-                    createdAt: msg.createdAt || new Date().toISOString(),
-                  })) || []
-                }
-                onSendMessage={() => {}}
-                settings={chatbot.settings}
-                isLoading={isSubmitting}
-              />
-            </div>
+        {/* Metrics Section */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-gray-800 p-4 rounded-lg shadow">
+            <p className="text-sm text-gray-400">Total Messages</p>
+            <p className="text-2xl font-bold">{metrics.totalMessages}</p>
           </div>
-        )}
-
-        <div className="card bg-base-100 shadow-sm mb-6">
-          <div className="card-body">
-            <h2 className="text-xl font-semibold mb-4">Send a Message</h2>
-            <Form method="post" onSubmit={handleSendMessage}>
-              <input type="hidden" name="action" value="sendMessage" />
-              <input type="hidden" name="conversationId" value={chatbot.conversations[0]?.id || ""} />
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text">Message</span>
-                </label>
-                <textarea
-                  name="message"
-                  className="textarea textarea-bordered"
-                  placeholder="Type your message..."
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  required
-                />
-              </div>
-              {actionData?.error && <div className="alert alert-error mt-4">{actionData.error}</div>}
-              <button type="submit" className="btn btn-primary mt-4" disabled={isSubmitting}>
-                {isSubmitting ? <span className="loading loading-spinner"></span> : "Send"}
-              </button>
-            </Form>
-            {actionData?.userMessage && actionData?.aiMessage && (
-              <div className="mt-4">
-                <p>
-                  <strong>You:</strong> {actionData.userMessage.content}{" "}
-                  <small>{new Date(actionData.userMessage.createdAt).toLocaleTimeString()}</small>
-                </p>
-                <p>
-                  <strong>AI:</strong> {actionData.aiMessage.content}{" "}
-                  <small>{new Date(actionData.aiMessage.createdAt).toLocaleTimeString()}</small>
-                </p>
-              </div>
-            )}
+          <div className="bg-gray-800 p-4 rounded-lg shadow">
+            <p className="text-sm text-gray-400">Conversations</p>
+            <p className="text-2xl font-bold">{metrics.totalConversations}</p>
+          </div>
+          <div className="bg-gray-800 p-4 rounded-lg shadow">
+            <p className="text-sm text-gray-400">Messages Used</p>
+            <p className="text-2xl font-bold">{messageCount}/10</p>
           </div>
         </div>
 
-        <div className="card bg-base-100 shadow-sm">
-          <div className="card-body">
-            <h2 className="text-xl font-semibold mb-4">Embed Code</h2>
-            <pre className="bg-gray-900 text-white p-4 rounded-lg overflow-x-auto">
-              <code>{codeSnippet.trim()}</code>
-            </pre>
+        {/* Chart Section */}
+        <div className="bg-gray-800 p-6 rounded-lg shadow">
+          <Line data={chartData} options={chartOptions} />
+        </div>
+
+        {/* Chat Preview */}
+        <div className="bg-gray-800 p-6 rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-4">Chat Preview</h2>
+          <ChatToggler
+            settings={chatbot.settings!}
+            messages={messages}
+            onSendMessage={handleSendMessage}
+            isLoading={fetcher.state === "submitting"}
+          />
+        </div>
+
+        {/* Code Snippets */}
+        <div className="bg-gray-800 p-6 rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-4">Embed Code</h2>
+          <div className="tabs tabs-bordered mb-4">
             <button
-              onClick={() => navigator.clipboard.writeText(codeSnippet.trim())}
-              className="btn btn-outline mt-4"
+              className={`tab ${activeTab === "vanillaJs" ? "tab-active" : ""}`}
+              onClick={() => setActiveTab("vanillaJs")}
             >
-              Copy Code
+              Vanilla JS
+            </button>
+            <button
+              className={`tab ${activeTab === "react" ? "tab-active" : ""}`}
+              onClick={() => setActiveTab("react")}
+            >
+              React
             </button>
           </div>
+          <pre className="bg-gray-900 p-4 rounded-lg text-sm overflow-x-auto">
+            <code>{codeSnippets[activeTab]}</code>
+          </pre>
+          <button
+            onClick={() => navigator.clipboard.writeText(codeSnippets[activeTab])}
+            className="btn btn-outline mt-4"
+          >
+            Copy {activeTab === "vanillaJs" ? "Vanilla JS" : "React"} Code
+          </button>
         </div>
       </div>
     </div>
   );
 }
-import { useState } from "react";
-import { json, Link, redirect } from "@remix-run/react";
+import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { Link } from "@remix-run/react";
 import { toast } from "react-hot-toast";
 import { ArrowRight } from "lucide-react";
 import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
-import { LoaderFunctionArgs } from "@remix-run/node";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { isAuthenticated } = await getKindeSession(request);
@@ -1879,47 +1865,35 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return json({});
 };
 
-function register({ authUrlParams }: { authUrlParams: { connection_id: string } }) {
-  // Construct the URL with the given connection_id for registration
-  const url = `/kinde-auth/register?connection_id=${authUrlParams.connection_id}`;
-  // Optionally show a toast message
-  toast("Redirecting to Google sign up...");
-  // Redirect to the Kinde authentication endpoint for registration
-  window.location.href = url;
-}
+export default function Register() {
+  const handleClick = () => {
+    toast("Redirecting to Google sign up...");
+  };
 
-const Register = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background/95 to-background/90 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-       {/* 3D Elements */}
- <div className="hidden lg:block absolute inset-0 overflow-hidden">
+      <div className="hidden lg:block absolute inset-0 overflow-hidden">
         <div className="parallax-layer absolute inset-0">
           <div className="cube-1"></div>
           <div className="cube-2"></div>
           <div className="cube-3"></div>
         </div>
-      </div> <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.1)_0,transparent_70%)]" />
+      </div>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.1)_0,transparent_70%)]" />
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
         <h2 className="text-center text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
           Join us!
-      
         </h2>
       </div>
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
         <div className="glass-card py-8 px-4 shadow-2xl sm:rounded-2xl sm:px-10">
-          {/* Button to trigger Google registration */}
-          <button
-            onClick={() =>
-              register({
-                authUrlParams: {
-                  connection_id: "conn_0190c847b77996ef9532a4f639f1bd5a", // Use the same or different connection ID as needed
-                },
-              })
-            }
+          <Link
+            to="/kinde-auth/register?connection_id=conn_0190c847b77996ef9532a4f639f1bd5a"
+            onClick={handleClick}
             className="neo-brutalism w-full flex justify-center items-center gap-2 py-2 px-4 bg-primary text-slate-900 text-sm font-medium rounded-xl"
           >
             Sign up with Google <ArrowRight className="w-4 h-4" />
-          </button>
+          </Link>
           <div className="mt-6">
             <div className="relative flex justify-center text-sm">
               <span className="px-2 text-gray-400">
@@ -1934,11 +1908,9 @@ const Register = () => {
       </div>
     </div>
   );
-};
-
-export default Register;// app/routes/checkout.tsx
-import { useState } from "react";
+}import { useState } from "react";
 import { Form } from "@remix-run/react";
+
 
 export default function Checkout() {
   const [showMessage, setShowMessage] = useState(false);
@@ -1949,96 +1921,69 @@ export default function Checkout() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="relative w-full h-full">
-        {/* Desktop Background */}
-        <div className="hidden lg:block absolute inset-0 overflow-hidden">
-          <div className="parallax-layer absolute inset-0">
-            <div className="cube-1"></div>
-            <div className="cube-2"></div>
-            <div className="cube-3"></div>
-          </div>
-        </div>
-
-        {/* Mobile Background */}
-        <div className="lg:hidden absolute inset-0 bg-blue-500"></div>
-
-        {/* Checkout Card */}
-        <div className="card w-full max-w-md bg-base-100 shadow-xl z-10">
-          <div className="card-body">
-            <h2 className="card-title text-3xl text-center mb-6">Checkout</h2>
-            <Form onSubmit={handlePay} className="form-control">
-              <div className="mb-4">
-                <label className="label">
-                  <span className="label-text">Name</span>
-                </label>
+    <div className="min-h-screen bg-gray-900 text-white">
+      
+      <div className="flex items-center justify-center py-12 px-4">
+        <div className="bg-gray-800 p-8 rounded-lg shadow-lg max-w-md w-full">
+          <h2 className="text-3xl font-bold mb-6 text-center">Upgrade Plan</h2>
+          <p className="text-center mb-6">You’ve reached the 10-message limit. Upgrade for unlimited access!</p>
+          <Form onSubmit={handlePay} className="space-y-4">
+            <div>
+              <label className="block text-sm">Name</label>
+              <input
+                type="text"
+                placeholder="John Doe"
+                className="input input-bordered w-full"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm">Email</label>
+              <input
+                type="email"
+                placeholder="john.doe@example.com"
+                className="input input-bordered w-full"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm">Card Number</label>
+              <input
+                type="text"
+                placeholder="1234 5678 9012 3456"
+                className="input input-bordered w-full"
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm">Expiry Date</label>
                 <input
                   type="text"
-                  placeholder="John Doe"
+                  placeholder="MM/YY"
                   className="input input-bordered w-full"
                   required
                 />
               </div>
-              <div className="mb-4">
-                <label className="label">
-                  <span className="label-text">Email</span>
-                </label>
-                <input
-                  type="email"
-                  placeholder="john.doe@example.com"
-                  className="input input-bordered w-full"
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="label">
-                  <span className="label-text">Card Number</span>
-                </label>
+              <div>
+                <label className="block text-sm">CVV</label>
                 <input
                   type="text"
-                  placeholder="1234 5678 9012 3456"
+                  placeholder="123"
                   className="input input-bordered w-full"
                   required
                 />
               </div>
-              <div className="mb-6 grid grid-cols-2 gap-4">
-                <div>
-                  <label className="label">
-                    <span className="label-text">Expiry Date</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="MM/YY"
-                    className="input input-bordered w-full"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="label">
-                    <span className="label-text">CVV</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="123"
-                    className="input input-bordered w-full"
-                    required
-                  />
-                </div>
-              </div>
-              <div className="card-actions justify-center">
-                <button type="submit" className="btn btn-primary w-full">
-                  Pay
-                </button>
-              </div>
-            </Form>
-            {showMessage && (
-              <div className="mt-4 text-center">
-                <p className="text-xl font-bold text-green-600">
-                  Just kidding! This is a demo, no payment was processed. Your money is safe!
-                </p>
-              </div>
-            )}
-          </div>
+            </div>
+            <button type="submit" className="btn btn-primary w-full">
+              Pay $29/month
+            </button>
+          </Form>
+          {showMessage && (
+            <p className="mt-4 text-center text-green-400">
+              Demo mode: No payment processed. Upgrade simulation complete!
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -2051,7 +1996,7 @@ import { LoaderFunctionArgs } from "@remix-run/node";
 import prisma from "~/utils/prisma.server";
 import { Suspense, useState } from "react";
 import { Settings, BarChart2, Bot, User, LogOut } from "lucide-react";
-import { getUsage } from "~/utils/usage.server";
+import { checkRateLimit } from "~/utils/usage.server";
 import { Logger } from "~/utils/logger.server";
 import { generateEmbedCode } from "~/utils/embed.server"; // Server-only import stays in loader
 import { ChatSettings, EmbedCode } from "~/types/types";
@@ -2096,7 +2041,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       const settings = c.settings
         ? {
             ...c.settings,
-            quickReplies: Array.isArray(c.settings.quickReplies) ? c.settings.quickReplies : [],
+            quickReplies: Array.isArray(c.settings.quickReplies)
+              ? (c.settings.quickReplies as Array<{ text: string; action: string }>)
+              : [],
           }
         : null;
       const embed = settings
@@ -2111,7 +2058,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         embed,
       };
     });
-
     let analytics = {
       total_messages: 0,
       total_conversations: 0,
@@ -2125,7 +2071,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       const totalConversations = await prisma.conversation.count({
         where: { chatbotId: { in: chatbotIds } },
       });
-      const usage = await Promise.all(chatbots.map((c) => getUsage(c.id)));
+      const usage = await Promise.all(chatbots.map((c) => checkRateLimit(c.id)));
       analytics = {
         total_messages: totalMessages,
         total_conversations: totalConversations,
@@ -2320,21 +2266,7 @@ const Cpanel = () => {
   );
 };
 
-export default Cpanel;// components/PreviewMode.tsx
-import { ChatToggler } from './chatToggler'
-
-export const PreviewMode = () => {
-  return (
-    <div className="mockup-window border bg-base-300">
-      <div className="px-4 py-16 bg-base-200">
-        <ChatToggler />
-        <div className="text-center mt-4">
-          <div className="badge badge-accent">Preview Mode</div>
-        </div>
-      </div>
-    </div>
-  )
-}// components/PromptSuggestions.tsx
+export default Cpanel;// components/PromptSuggestions.tsx
 export const PromptSuggestions = () => {
     const suggestions = [
       "How do I reset my password?",
@@ -2422,7 +2354,7 @@ export const ChatInterface = () => {
 }// app/components/layout/navbar.tsx
 import { useState } from "react";
 import { Link } from "@remix-run/react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, LogOut } from "lucide-react";
 import { motion } from "framer-motion";
 
 export const Navbar = () => {
@@ -2486,6 +2418,22 @@ export const Navbar = () => {
                 />
               )}
             </Link>
+            <Link
+              to="/logout"
+              className="neo-brutalism inline-flex items-center gap-2 text-gray-300 hover:text-white px-3 py-2 rounded-xl text-sm font-medium"
+              onMouseEnter={() => setHoveredPath("/logout")}
+              onMouseOut={() => setHoveredPath("")}
+            >
+              <LogOut className="w-5 h-5" />
+              Logout
+              {hoveredPath === "/logout" && (
+                <motion.div
+                  layoutId="navbar-hover"
+                  className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-xl glass"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                />
+              )}
+            </Link>
           </div>
           <div className="flex items-center sm:hidden">
             <button
@@ -2509,6 +2457,10 @@ export const Navbar = () => {
             </Link>
             <Link to="/dashboard" className="neo-brutalism inline-flex items-center gap-2 px-3 py-2 text-base font-medium text-gray-300 hover:text-white">
               Dashboard
+            </Link>
+            <Link to="/logout" className="neo-brutalism inline-flex items-center gap-2 px-3 py-2 text-base font-medium text-gray-300 hover:text-white">
+              <LogOut className="w-5 h-5" />
+              Logout
             </Link>
           </div>
         </div>
@@ -2652,200 +2604,149 @@ function AnalyticsChart({ analyticsData }: AnalyticsChartProps) {
   return <Line options={chartOptions} data={chartData} />;
 }
 
-export default AnalyticsChart;// app/components/chatPreview.tsx
-import { useState } from "react";
-import { Trash2 } from "lucide-react";
-
-// Unified Message type matching Prisma schema
-interface Message {
-  id: string;
-  content: string;
-  role: "user" | "assistant";
-  createdAt: Date;
-}
-
-// Full ChatSettings type matching Prisma model
-interface ChatSettings {
-  chatWidth: number;
-  chatHeight: number;
-  chatBackground: string;
-  chatOpacity: number;
-  chatBorderRadius: number;
-  brandColor: string;
-  customLogo?: string | null;
-  showEmailCapture: boolean;
-  emailPlaceholder: string;
-  quickReplies: Array<{ text: string; action: string }>;
-  userBubbleColor: string;
-  aiBubbleColor: string;
-  headingColor: string;
-}
+export default AnalyticsChart;import { useState } from "react";
+import { ChatSettings, Message } from "~/types/types";
 
 interface ChatPreviewProps {
-  messages: Array<{
-    id: string;
-    content: string;
-    role: "user" | "assistant";
-    createdAt: Date;
-  }>;
+  messages: Message[];
   onSendMessage: (message: string) => void;
   settings: ChatSettings;
   isLoading?: boolean;
 }
 
 export const ChatPreview = ({ messages, onSendMessage, settings, isLoading }: ChatPreviewProps) => {
-  const [email, setEmail] = useState("");
-  
-  // Proper type for quick reply handler
-  const handleSuggestionClick = (text: string) => {
-    onSendMessage(text);
+  const [input, setInput] = useState("");
+
+  const handleSend = () => {
+    if (!input.trim()) return;
+    onSendMessage(input);
+    setInput("");
   };
 
   return (
     <div
-      className="chat-preview relative"
+      className="relative border rounded-lg shadow-lg overflow-hidden"
       style={{
         width: `${settings.chatWidth}px`,
         height: `${settings.chatHeight}px`,
         background: settings.chatBackground,
         opacity: settings.chatOpacity,
         borderRadius: `${settings.chatBorderRadius}px`,
-        boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
       }}
     >
       <div
-        className="header p-3 flex items-center"
-        style={{ 
-          background: settings.brandColor, 
-          color: settings.headingColor, 
-          borderRadius: `${settings.chatBorderRadius}px ${settings.chatBorderRadius}px 0 0` 
-        }}
+        className="p-3 flex items-center"
+        style={{ background: settings.brandColor, color: settings.headingColor }}
       >
         {settings.customLogo && (
-          <img 
-            src={settings.customLogo} 
-            alt="Logo" 
-            className="w-8 h-8 mr-2 rounded-full" 
-          />
+          <img src={settings.customLogo} alt="Logo" className="w-8 h-8 mr-2 rounded-full" />
         )}
         <h3 className="text-lg font-semibold">Chatbot</h3>
       </div>
-      
-      <div 
-        className="messages p-4 overflow-y-auto" 
-        style={{ height: `${settings.chatHeight - 150}px` }}
+      <div
+        className="p-4 overflow-y-auto"
+        style={{ height: `${settings.chatHeight - 120}px` }}
       >
         {messages.map((msg) => (
           <div
-            key={msg.id || msg.content}
-            className={`message mb-2 p-3 rounded-lg ${msg.role === "user" ? "ml-auto" : "mr-auto"}`}
+            key={msg.id}
+            className={`mb-2 p-3 rounded-lg ${msg.role === "user" ? "ml-auto" : "mr-auto"}`}
             style={{
-              background: msg.role === "user" 
-                ? settings.userBubbleColor 
-                : settings.aiBubbleColor,
+              background: msg.role === "user" ? settings.userBubbleColor : settings.aiBubbleColor,
               maxWidth: "80%",
-              color: "#000000",
             }}
           >
             <p>{msg.content}</p>
-            <small className="text-xs opacity-70 block mt-1">
-              {msg.createdAt.toLocaleTimeString()}
+            <small className="text-xs text-gray-500 block mt-1">
+              {new Date(msg.createdAt).toLocaleTimeString()}
             </small>
           </div>
         ))}
-        
         {isLoading && (
-          <div 
-            className="message mb-2 p-3 rounded-lg mr-auto" 
-            style={{ background: settings.aiBubbleColor }}
-          >
-            <span className="loading loading-spinner"></span>
+          <div className="mb-2 p-3 rounded-lg mr-auto flex items-center" style={{ background: settings.aiBubbleColor }}>
+            <span className="loading loading-spinner mr-2"></span> Thinking...
           </div>
         )}
       </div>
-
-      {settings.showEmailCapture && !email && (
-        <div className="email-capture p-4">
-          <input
-            type="email"
-            placeholder={settings.emailPlaceholder}
-            className="input input-bordered w-full"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
+      <div className="p-4 border-t">
+        <div className="flex gap-2 mb-2 flex-wrap">
+          {settings.quickReplies.map((reply, index) => (
+            <button
+              key={index}
+              className="btn btn-sm btn-outline"
+              onClick={() => onSendMessage(reply.text)}
+              style={{ background: settings.brandColor, color: "#fff" }}
+            >
+              {reply.text}
+            </button>
+          ))}
         </div>
-      )}
-
-      <div className="suggestions p-4 border-t">
-        {settings.quickReplies.map((reply, index) => (
-          <button
-            key={index}
-            className="btn btn-sm btn-outline mr-2 mb-2"
-            onClick={() => handleSuggestionClick(reply.text)}
-            style={{ 
-              background: settings.brandColor, 
-              color: "#ffffff",
-              borderColor: settings.brandColor
-            }}
-          >
-            {reply.text}
-          </button>
-        ))}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyPress={(e) => e.key === "Enter" && handleSend()}
+            className="input input-bordered flex-1"
+            placeholder="Type a message..."
+          />
+          <button onClick={handleSend} className="btn btn-primary">Send</button>
+        </div>
       </div>
     </div>
   );
 };// components/Skeleton.tsx
 export default function Skeleton({ lines = 3 }: { lines?: number }) {
-    return (
-      <div className="animate-pulse space-y-4">
-        {Array.from({ length: lines }).map((_, i) => (
-          <div key={i} className="h-4 bg-gray-200 rounded w-full" />
-        ))}
-      </div>
-    );
-  }// components/ChatToggler.tsx
-import { useState } from 'react'
-import {ChatInterface} from './chatInterface'
-import { ChatPreview } from './chatPreview'
-export const ChatToggler = () => {
-  const [isOpen, setIsOpen] = useState(false)
+  return (
+    <div className="animate-pulse space-y-4">
+      {Array.from({ length: lines }).map((_, i) => (
+        <div
+          key={i}
+          className="h-4 bg-gray-200 rounded"
+          style={{
+            width: `${Math.random() * 50 + 50}%`, // Width between 50% and 100%
+            backgroundColor: i % 2 === 0 ? 'bg-gray-300' : 'bg-gray-200' // Alternate colors
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+import { useState } from "react";
+import { ChatPreview } from "./chatPreview";
+import { ChatSettings, Message } from "~/types/types";
+
+interface ChatTogglerProps {
+  settings: ChatSettings;
+  messages: Message[];
+  onSendMessage: (message: string) => void;
+  isLoading?: boolean;
+}
+
+export const ChatToggler = ({ settings, messages, onSendMessage, isLoading }: ChatTogglerProps) => {
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="fixed bottom-4 right-4">
-      <button 
+    <div className="fixed bottom-4 right-4 z-50">
+      <button
         onClick={() => setIsOpen(!isOpen)}
-        className="btn btn-circle btn-primary shadow-lg"
+        className="btn btn-circle btn-primary shadow-lg text-2xl"
       >
-        {isOpen ? '×' : '💬'}
+        {isOpen ? "×" : "💬"}
       </button>
-      
-      <div className={`${isOpen ? 'block' : 'hidden'} chat-window`}>
-        <div className="card w-96 bg-base-100 shadow-xl">
-          <div className="card-body">
-            <ChatPreview settings={{
-              chatWidth: undefined,
-              chatHeight: undefined,
-              chatBackground: '',
-              chatOpacity: 0,
-              chatBorderRadius: 0,
-              brandColor: '',
-              customLogo: undefined,
-              showEmailCapture: false,
-              emailPlaceholder: '',
-              quickReplies: [],
-              capturedEmail: undefined,
-              onEmailCapture: function (value: string): void {
-                throw new Error('Function not implemented.')
-              }
-            }} messages={[]} onSendMessage={function (message: string): void {
-              throw new Error('Function not implemented.')
-            } } />
-          </div>
+      {isOpen && (
+        <div className="mt-2">
+          <ChatPreview
+            settings={settings}
+            messages={messages}
+            onSendMessage={onSendMessage}
+            isLoading={isLoading}
+          />
         </div>
-      </div>
+      )}
     </div>
-  )
-}interface TabProps {
+  );
+};interface TabProps {
   id: string;
   label: string;
   icon: React.ReactNode;
@@ -2918,7 +2819,7 @@ export default function ErrorComponent({
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background/95 to-background/90">
-      <Navbar  />
+     
       
       <motion.main
         initial={{ opacity: 0, y: 20 }}
@@ -3029,11 +2930,14 @@ export async function requireAuth(request: Request): Promise<User> {
     };
   
     return templates[language as keyof typeof templates] || 'Language not supported';
-  }// app/utils/embed.server.ts
-import { ChatSettings, EmbedCode } from "~/types/types";
+  }import { ChatSettings, EmbedCode } from "~/types/types";
 
 export function generateEmbedCode(settings: ChatSettings, connectionString: string): EmbedCode {
-  const { brandColor, customLogo, chatWidth, chatHeight } = settings;
+  const {
+    brandColor, customLogo, chatWidth, chatHeight, chatBackground,
+    chatOpacity, chatBorderRadius, userBubbleColor, aiBubbleColor, headingColor,
+    quickReplies,
+  } = settings;
 
   const reactCode = `
 import React from 'react';
@@ -3046,6 +2950,13 @@ export const Chatbot = () => (
     ${customLogo ? `customLogo="${customLogo}"` : ""}
     chatWidth={${chatWidth}}
     chatHeight={${chatHeight}}
+    chatBackground="${chatBackground}"
+    chatOpacity={${chatOpacity}}
+    chatBorderRadius={${chatBorderRadius}}
+    userBubbleColor="${userBubbleColor}"
+    aiBubbleColor="${aiBubbleColor}"
+    headingColor="${headingColor}"
+    quickReplies={${JSON.stringify(quickReplies)}}
   />
 );
 `.trim();
@@ -3059,122 +2970,135 @@ export const Chatbot = () => (
     brandColor: "${brandColor}",
     ${customLogo ? `customLogo: "${customLogo}",` : ""}
     chatWidth: ${chatWidth},
-    chatHeight: ${chatHeight}
+    chatHeight: ${chatHeight},
+    chatBackground: "${chatBackground}",
+    chatOpacity: ${chatOpacity},
+    chatBorderRadius: ${chatBorderRadius},
+    userBubbleColor: "${userBubbleColor}",
+    aiBubbleColor: "${aiBubbleColor}",
+    headingColor: "${headingColor}",
+    quickReplies: ${JSON.stringify(quickReplies)}
   });
   chatbot.init("chatbot-container");
 </script>
 `.trim();
 
-  return { react: reactCode, vanillaJs: vanillaJsCode };
-}// app/utils/usage.server.ts
-import { redis } from "./redis.server";
+  return { react: reactCode, vanillaJs: reactCode };
+}import { redis, rateLimiter } from "./redis.server";
 import prisma from "./prisma.server";
 import { Logger } from "./logger.server";
-import { AnalyticsData } from "~/types/types";
 
-export async function trackUsage(chatbotId: string, action: "message" | "api_call") {
-  const today = new Date().toISOString().split("T")[0];
-  const key = `usage:${chatbotId}:${today}`;
-
+export async function trackUsage(chatbotId: string, userId: string) {
+  const key = `usage:${userId}:${chatbotId}`;
   try {
-    await redis.incr(`${key}:${action}`);
-    Logger.info(`Tracked ${action} for chatbot ${chatbotId}`, { date: today });
+    await redis.incr(key);
+    Logger.info(`Tracked message for chatbot ${chatbotId} by user ${userId}`);
   } catch (err) {
-    Logger.error("Failed to track usage in Redis", { error: err, chatbotId });
+    Logger.error("Failed to track usage in Redis", { error: err });
   }
 
-  // Persist to Prisma periodically (e.g., via cron job)
-  await prisma.usage.upsert({
-    where: { chatbotId_date: { chatbotId, date: today } },
-    update: { [action]: { increment: 1 } },
-    create: { chatbotId, date: today, [action]: 1, api_calls: 0, messages: 0 },
+  await prisma.message.create({
+    data: {
+      content: "Usage tracked",
+      role: "system",
+      conversation: { connect: { id: (await prisma.conversation.findFirst({ where: { chatbotId } }))?.id } },
+    },
   });
 }
 
-export async function getUsage(chatbotId: string, days: number = 7): Promise<AnalyticsData["usage"]> {
-  const usage = [];
-  for (let i = 0; i < days; i++) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    const dateStr = date.toISOString().split("T")[0];
-    const key = `usage:${chatbotId}:${dateStr}`;
-    const messages = Number(await redis.get(`${key}:message`) || 0);
-    usage.push({ date: dateStr, messages });
-  }
-  return usage;
-}// Singleton pattern for Prisma client
-import { PrismaClient } from '@prisma/client';
+export async function getUserMetrics(userId: string) {
+  const chatbots = await prisma.chatbot.findMany({ where: { userId } });
+  const chatbotIds = chatbots.map((c) => c.id);
+
+  const totalMessages = await prisma.message.count({
+    where: { conversation: { chatbotId: { in: chatbotIds } } },
+  });
+  const totalConversations = await prisma.conversation.count({
+    where: { chatbotId: { in: chatbotIds } },
+  });
+
+  return { totalMessages, totalConversations, chatbotCount: chatbots.length };
+}
+
+export async function checkRateLimit(userId: string) {
+  const { success, remaining } = await rateLimiter.limit(userId);
+  return { success, remaining };
+}import { PrismaClient } from "@prisma/client";
+import { env } from "~/config/env";
 
 declare global {
   var prisma: PrismaClient | undefined;
 }
 
-const prisma = global.prisma || new PrismaClient();
+export const prisma = global.prisma || new PrismaClient({
+  log: env.NODE_ENV === "development" ? ["query", "info", "warn", "error"] : ["error"],
+});
 
-if (process.env.NODE_ENV !== 'production') global.prisma = prisma;
+if (env.NODE_ENV !== "production") global.prisma = prisma;
 
-export default prisma;// app/utils/redis.server.ts
-import { Redis } from "@upstash/redis";
+export default prisma;import { Redis } from "@upstash/redis";
 import { Ratelimit } from "@upstash/ratelimit";
-import { RateLimiterResponse } from "../types/types";
+import { env } from "~/config/env";
 
 export const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+  url: env.UPSTASH_REDIS_REST_URL,
+  token: env.UPSTASH_REDIS_REST_TOKEN,
 });
 
 export const rateLimiter = new Ratelimit({
   redis,
-  limiter: Ratelimit.slidingWindow(100, "60 s"), // 100 requests per minute
+  limiter: Ratelimit.fixedWindow(10, "10000000 d"), // 10 responses per lifetime
   analytics: true,
   prefix: "chatbot:ratelimit",
 });
 
-export async function limitRequest(ip: string): Promise<RateLimiterResponse> {
-  return rateLimiter.limit(ip);
-}// app/utils/gemini.server.ts (Commented out original for reference)
-/*
-export const generateResponse = async (message: string, context: string): Promise<string> => {
-  // Original Gemini logic
-  return "Response from Gemini"; // Placeholder
-};
-*/
-
-// Updated with LangChain and Astra DB
-import { AstraDB } from "@datastax/astra-db-ts";
-import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
+export async function checkRateLimit(userId: string) {
+  const { success, remaining } = await rateLimiter.limit(userId);
+  return { success, remaining };
+}// app/utils/gemini.server.ts
 import { AstraDBVectorStore } from "@langchain/community/vectorstores/astradb";
 import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { RunnableSequence } from "@langchain/core/runnables";
+import { RunnableSequence, RunnableMap } from "@langchain/core/runnables";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { PromptTemplate } from "@langchain/core/prompts";
+import { TaskType } from "@google/generative-ai";
+import { env } from "~/config/env";
+import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 
-const astraDb = new AstraDB(process.env.ASTRA_TOKEN, process.env.ASTRA_ENDPOINT, process.env.ASTRA_NAMESPACE);
-const embeddings = new GoogleGenerativeAIEmbeddings({ apiKey: process.env.GEMINI_API_KEY });
-const llm = new ChatGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY, model: "gemini-1.5-pro" });
+const embeddings = new GoogleGenerativeAIEmbeddings({
+  apiKey: env.GOOGLE_API_KEY,
+  modelName: "text-embedding-004",
+  taskType: TaskType.RETRIEVAL_DOCUMENT,
+});
 
-// Initialize vector store (run once or on setup)
-async function initializeVectorStore() {
+const llm = new ChatGoogleGenerativeAI({
+  apiKey: env.GOOGLE_API_KEY,
+  model: "gemini-1.5-pro",
+  temperature: 0.7,
+  maxRetries: 2,
+});
+
+export async function initializeVectorStore() {
   const splitter = new RecursiveCharacterTextSplitter({ chunkSize: 1000, chunkOverlap: 200 });
   const docs = [
-    "Sample document content about chatbots...",
-    // Add more docs or load from a source
+    "Chatbots are AI-powered conversational agents that assist users.",
+    "To customize your chatbot, adjust colors, sizes, and quick replies in the settings panel.",
+    "For support, contact us at support@chatbuilder.com.",
   ];
   const splitDocs = await splitter.createDocuments(docs);
   await AstraDBVectorStore.fromDocuments(splitDocs, embeddings, {
-    collection: "chatbot_docs",
-    client: astraDb,
+    token: env.ASTRA_DB_APPLICATION_TOKEN,
+    endpoint: env.ASTRA_DB_ENDPOINT,
+    collection: env.ASTRA_DB_COLLECTION,
   });
 }
 
-// Export this if you need to initialize elsewhere
-export { initializeVectorStore };
-
 export const generateResponse = async (message: string, context: string): Promise<string> => {
-  const vectorStore = await AstraDBVectorStore.fromExistingCollection(embeddings, {
-    collection: "chatbot_docs",
-    client: astraDb,
+  const vectorStore = await AstraDBVectorStore.fromExistingIndex(embeddings, {
+    token: env.ASTRA_DB_APPLICATION_TOKEN,
+    endpoint: env.ASTRA_DB_ENDPOINT,
+    collection: env.ASTRA_DB_COLLECTION,
   });
 
   const retriever = vectorStore.asRetriever();
@@ -3183,16 +3107,21 @@ export const generateResponse = async (message: string, context: string): Promis
   );
 
   const chain = RunnableSequence.from([
-    {
+    RunnableMap.from({
       context: retriever.pipe((docs) => docs.map((doc) => doc.pageContent).join("\n")),
-      question: (input) => input.question,
-    },
+      question: (input: string) => input, // Pass message directly
+    }),
     prompt,
     llm,
     new StringOutputParser(),
   ]);
 
-  return await chain.invoke({ question: message });
+  try {
+    return await chain.invoke(message); // Pass message as the input
+  } catch (error) {
+    console.error("Error generating response:", error);
+    return "Sorry, I couldn’t process your request.";
+  }
 };// ~/utils/astra.server.ts
 import { DataAPIClient, Db } from "@datastax/astra-db-ts";
 
@@ -3211,9 +3140,6 @@ export function connectToDatabase(): Db {
   console.log(`Connected to database ${database.id}`);
   return database;
 }
-// app/utils/logger.server.ts
-import { join } from "path";
-
 type LogLevel = "info" | "error" | "warn";
 
 interface LogEntry {
@@ -3224,8 +3150,6 @@ interface LogEntry {
 }
 
 export class Logger {
-  private static logFile = join(process.cwd(), "logs", "app.log");
-
   static log(level: LogLevel, message: string, data?: Record<string, any>) {
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),
@@ -3233,19 +3157,7 @@ export class Logger {
       message,
       data,
     };
-    const logString = JSON.stringify(entry) + "\n";
-
-    // Output log to the terminal
-    console.log(logString);
-
-    // Optionally, you can still write to the log file if needed
-    /*
-    try {
-      writeFileSync(this.logFile, logString, { flag: "a" });
-    } catch (err) {
-      console.error("Failed to write log:", err);
-    }
-    */
+    console.log(JSON.stringify(entry));
   }
 
   static info(message: string, data?: Record<string, any>) {

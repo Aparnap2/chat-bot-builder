@@ -1,46 +1,47 @@
-// app/utils/gemini.server.ts (Commented out original for reference)
-/*
-export const generateResponse = async (message: string, context: string): Promise<string> => {
-  // Original Gemini logic
-  return "Response from Gemini"; // Placeholder
-};
-*/
-
-// Updated with LangChain and Astra DB
-import { AstraDB } from "@datastax/astra-db-ts";
-import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
+// app/utils/gemini.server.ts
 import { AstraDBVectorStore } from "@langchain/community/vectorstores/astradb";
 import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { RunnableSequence } from "@langchain/core/runnables";
+import { RunnableSequence, RunnableMap } from "@langchain/core/runnables";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { PromptTemplate } from "@langchain/core/prompts";
+import { TaskType } from "@google/generative-ai";
+import { env } from "~/config/env";
+import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 
-const astraDb = new AstraDB(process.env.ASTRA_TOKEN, process.env.ASTRA_ENDPOINT, process.env.ASTRA_NAMESPACE);
-const embeddings = new GoogleGenerativeAIEmbeddings({ apiKey: process.env.GEMINI_API_KEY });
-const llm = new ChatGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY, model: "gemini-1.5-pro" });
+const embeddings = new GoogleGenerativeAIEmbeddings({
+  apiKey: env.GOOGLE_API_KEY,
+  modelName: "text-embedding-004",
+  taskType: TaskType.RETRIEVAL_DOCUMENT,
+});
 
-// Initialize vector store (run once or on setup)
-async function initializeVectorStore() {
+const llm = new ChatGoogleGenerativeAI({
+  apiKey: env.GOOGLE_API_KEY,
+  model: "gemini-1.5-pro",
+  temperature: 0.7,
+  maxRetries: 2,
+});
+
+export async function initializeVectorStore() {
   const splitter = new RecursiveCharacterTextSplitter({ chunkSize: 1000, chunkOverlap: 200 });
   const docs = [
-    "Sample document content about chatbots...",
-    // Add more docs or load from a source
+    "Chatbots are AI-powered conversational agents that assist users.",
+    "To customize your chatbot, adjust colors, sizes, and quick replies in the settings panel.",
+    "For support, contact us at support@chatbuilder.com.",
   ];
   const splitDocs = await splitter.createDocuments(docs);
   await AstraDBVectorStore.fromDocuments(splitDocs, embeddings, {
-    collection: "chatbot_docs",
-    client: astraDb,
+    token: env.ASTRA_DB_APPLICATION_TOKEN,
+    endpoint: env.ASTRA_DB_ENDPOINT,
+    collection: env.ASTRA_DB_COLLECTION,
   });
 }
 
-// Export this if you need to initialize elsewhere
-export { initializeVectorStore };
-
-export const generateResponse = async (message: string, context: string): Promise<string> => {
-  const vectorStore = await AstraDBVectorStore.fromExistingCollection(embeddings, {
-    collection: "chatbot_docs",
-    client: astraDb,
+export const generateResponse = async (message: string, context: string, id: string): Promise<string> => {
+  const vectorStore = await AstraDBVectorStore.fromExistingIndex(embeddings, {
+    token: env.ASTRA_DB_APPLICATION_TOKEN,
+    endpoint: env.ASTRA_DB_ENDPOINT,
+    collection: env.ASTRA_DB_COLLECTION,
   });
 
   const retriever = vectorStore.asRetriever();
@@ -49,14 +50,19 @@ export const generateResponse = async (message: string, context: string): Promis
   );
 
   const chain = RunnableSequence.from([
-    {
-      context: retriever.pipe((docs: any[]) => docs.map((doc) => doc.pageContent).join("\n")),
-      question: (input) => input.question,
-    },
+    RunnableMap.from({
+      context: retriever.pipe((docs) => docs.map((doc) => doc.pageContent).join("\n")),
+      question: (input: string) => input, // Pass message directly
+    }),
     prompt,
     llm,
     new StringOutputParser(),
   ]);
 
-  return await chain.invoke({ question: message });
+  try {
+    return await chain.invoke(message); // Pass message as the input
+  } catch (error) {
+    console.error("Error generating response:", error);
+    return "Sorry, I couldn’t process your request.";
+  }
 };

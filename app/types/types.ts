@@ -64,3 +64,16 @@ export interface RateLimiterResponse {
   success: boolean;
   remaining: number;
 }
+
+export interface Chatbot {
+  id: string;
+  name: string;
+  connectionString: string;
+  userId: string;
+  createdAt: Date;
+  settings: ChatSettings | null;
+  conversations: Array<{
+    id: string;
+    messages: Message[];
+  }>;
+}

@@ -1,8 +1,11 @@
-// app/utils/embed.server.ts
 import { ChatSettings, EmbedCode } from "~/types/types";
 
-export function generateEmbedCode(settings: ChatSettings, connectionString: string): EmbedCode {
-  const { brandColor, customLogo, chatWidth, chatHeight } = settings;
+export function generateEmbedCode(settings: ChatSettings, connectionString: string, name: string): EmbedCode {
+  const {
+    brandColor, customLogo, chatWidth, chatHeight, chatBackground,
+    chatOpacity, chatBorderRadius, userBubbleColor, aiBubbleColor, headingColor,
+    quickReplies,
+  } = settings;
 
   const reactCode = `
 import React from 'react';
@@ -15,6 +18,13 @@ export const Chatbot = () => (
     ${customLogo ? `customLogo="${customLogo}"` : ""}
     chatWidth={${chatWidth}}
     chatHeight={${chatHeight}}
+    chatBackground="${chatBackground}"
+    chatOpacity={${chatOpacity}}
+    chatBorderRadius={${chatBorderRadius}}
+    userBubbleColor="${userBubbleColor}"
+    aiBubbleColor="${aiBubbleColor}"
+    headingColor="${headingColor}"
+    quickReplies={${JSON.stringify(quickReplies)}}
   />
 );
 `.trim();
@@ -28,11 +38,18 @@ export const Chatbot = () => (
     brandColor: "${brandColor}",
     ${customLogo ? `customLogo: "${customLogo}",` : ""}
     chatWidth: ${chatWidth},
-    chatHeight: ${chatHeight}
+    chatHeight: ${chatHeight},
+    chatBackground: "${chatBackground}",
+    chatOpacity: ${chatOpacity},
+    chatBorderRadius: ${chatBorderRadius},
+    userBubbleColor: "${userBubbleColor}",
+    aiBubbleColor: "${aiBubbleColor}",
+    headingColor: "${headingColor}",
+    quickReplies: ${JSON.stringify(quickReplies)}
   });
   chatbot.init("chatbot-container");
 </script>
 `.trim();
 
-  return { react: reactCode, vanillaJs: vanillaJsCode };
+  return { react: reactCode, vanillaJs: reactCode };
 }

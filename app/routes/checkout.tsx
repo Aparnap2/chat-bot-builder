@@ -1,6 +1,6 @@
-// app/routes/checkout.tsx
 import { useState } from "react";
 import { Form } from "@remix-run/react";
+
 
 export default function Checkout() {
   const [showMessage, setShowMessage] = useState(false);
@@ -11,96 +11,69 @@ export default function Checkout() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="relative w-full h-full">
-        {/* Desktop Background */}
-        <div className="hidden lg:block absolute inset-0 overflow-hidden">
-          <div className="parallax-layer absolute inset-0">
-            <div className="cube-1"></div>
-            <div className="cube-2"></div>
-            <div className="cube-3"></div>
-          </div>
-        </div>
-
-        {/* Mobile Background */}
-        <div className="lg:hidden absolute inset-0 bg-blue-500"></div>
-
-        {/* Checkout Card */}
-        <div className="card w-full max-w-md bg-base-100 shadow-xl z-10">
-          <div className="card-body">
-            <h2 className="card-title text-3xl text-center mb-6">Checkout</h2>
-            <Form onSubmit={handlePay} className="form-control">
-              <div className="mb-4">
-                <label className="label">
-                  <span className="label-text">Name</span>
-                </label>
+    <div className="min-h-screen bg-gray-900 text-white">
+      
+      <div className="flex items-center justify-center py-12 px-4">
+        <div className="bg-gray-800 p-8 rounded-lg shadow-lg max-w-md w-full">
+          <h2 className="text-3xl font-bold mb-6 text-center">Upgrade Plan</h2>
+          <p className="text-center mb-6">You’ve reached the 10-message limit. Upgrade for unlimited access!</p>
+          <Form onSubmit={handlePay} className="space-y-4">
+            <div>
+              <label className="block text-sm">Name</label>
+              <input
+                type="text"
+                placeholder="John Doe"
+                className="input input-bordered w-full"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm">Email</label>
+              <input
+                type="email"
+                placeholder="john.doe@example.com"
+                className="input input-bordered w-full"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm">Card Number</label>
+              <input
+                type="text"
+                placeholder="1234 5678 9012 3456"
+                className="input input-bordered w-full"
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm">Expiry Date</label>
                 <input
                   type="text"
-                  placeholder="John Doe"
+                  placeholder="MM/YY"
                   className="input input-bordered w-full"
                   required
                 />
               </div>
-              <div className="mb-4">
-                <label className="label">
-                  <span className="label-text">Email</span>
-                </label>
-                <input
-                  type="email"
-                  placeholder="john.doe@example.com"
-                  className="input input-bordered w-full"
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="label">
-                  <span className="label-text">Card Number</span>
-                </label>
+              <div>
+                <label className="block text-sm">CVV</label>
                 <input
                   type="text"
-                  placeholder="1234 5678 9012 3456"
+                  placeholder="123"
                   className="input input-bordered w-full"
                   required
                 />
               </div>
-              <div className="mb-6 grid grid-cols-2 gap-4">
-                <div>
-                  <label className="label">
-                    <span className="label-text">Expiry Date</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="MM/YY"
-                    className="input input-bordered w-full"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="label">
-                    <span className="label-text">CVV</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="123"
-                    className="input input-bordered w-full"
-                    required
-                  />
-                </div>
-              </div>
-              <div className="card-actions justify-center">
-                <button type="submit" className="btn btn-primary w-full">
-                  Pay
-                </button>
-              </div>
-            </Form>
-            {showMessage && (
-              <div className="mt-4 text-center">
-                <p className="text-xl font-bold text-green-600">
-                  Just kidding! This is a demo, no payment was processed. Your money is safe!
-                </p>
-              </div>
-            )}
-          </div>
+            </div>
+            <button type="submit" className="btn btn-primary w-full">
+              Pay $29/month
+            </button>
+          </Form>
+          {showMessage && (
+            <p className="mt-4 text-center text-green-400">
+              Demo mode: No payment processed. Upgrade simulation complete!
+            </p>
+          )}
         </div>
       </div>
     </div>

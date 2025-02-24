@@ -2,7 +2,6 @@
 import { useEffect } from "react";
 import { Link, useNavigate } from "@remix-run/react";
 import { LoaderFunctionArgs, json, redirect } from "@remix-run/node";
-import { Navbar } from "~/components/layout/navbar";
 import { Bot, BarChart2, Settings, ArrowRight } from "lucide-react";
 import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
 
@@ -31,7 +30,7 @@ export default function Index() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background/95 to-background/90 relative">
-      <Navbar />
+      
       {/* 3D Elements */}
       <div className="hidden lg:block absolute inset-0 overflow-hidden">
         <div className="parallax-layer absolute inset-0">

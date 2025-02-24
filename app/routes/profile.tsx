@@ -5,8 +5,7 @@ import { useLoaderData, Link } from "@remix-run/react";
 import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
 import prisma from "~/utils/prisma.server";
 import { Settings, BarChart2 } from "lucide-react";
-import { Navbar } from "~/components/layout/navbar";
-import { Logger } from "~/utils/logger.server";
+
 
 type LoaderData = {
   user: {
@@ -55,12 +54,12 @@ export default function Profile() {
       name: kindeUser.given_name || "",
     };
     localStorage.setItem("user", JSON.stringify(userData));
-    Logger.info("User data stored in local storage from profile", { userId: kindeUser.id });
+  
   }, [kindeUser]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background/95 to-background/90">
-      <Navbar />
+      
       <div className="hidden lg:block absolute inset-0 overflow-hidden">
         <div className="parallax-layer absolute inset-0">
           <div className="cube-1"></div>

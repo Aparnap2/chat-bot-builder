@@ -1,20 +1,20 @@
-// app/utils/redis.server.ts
 import { Redis } from "@upstash/redis";
 import { Ratelimit } from "@upstash/ratelimit";
-import { RateLimiterResponse } from "../types/types";
+import { env } from "~/config/env";
 
 export const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+  url: env.UPSTASH_REDIS_REST_URL,
+  token: env.UPSTASH_REDIS_REST_TOKEN,
 });
 
 export const rateLimiter = new Ratelimit({
   redis,
-  limiter: Ratelimit.slidingWindow(100, "60 s"), // 100 requests per minute
+  limiter: Ratelimit.fixedWindow(10, "10000000 d"), // 10 responses per lifetime
   analytics: true,
   prefix: "chatbot:ratelimit",
 });
 
-export async function limitRequest(ip: string): Promise<RateLimiterResponse> {
-  return rateLimiter.limit(ip);
+export async function checkRateLimit(userId: string) {
+  const { success, remaining } = await rateLimiter.limit(userId);
+  return { success, remaining };
 }
