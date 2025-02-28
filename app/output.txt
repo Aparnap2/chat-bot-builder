@@ -1,64 +1,962 @@
-import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
-import { Link } from "@remix-run/react";
-import { toast } from "react-hot-toast";
-import { ArrowRight } from "lucide-react";
-import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
+]633;E;find ./ -print;fc0c0a1d-7b41-4026-bfb1-39b0ba72c606]633;C./
+./entry.client.tsx
+./hooks
+./hooks/usechatSettings.ts
+./components
+./components/chatInterface.tsx
+./components/error.tsx
+./components/Analytics.tsx
+./components/tab.tsx
+./components/Skeleton.tsx
+./components/chatToggler.tsx
+./components/layout
+./components/layout/navbar.tsx
+./components/PromptEditor.tsx
+./components/chatPreview.tsx
+./components/PromptSuggestions.tsx
+./output.txt
+./config
+./config/env.ts
+./entry.server.tsx
+./tailwind.css
+./routes
+./routes/dashboard.tsx
+./routes/chatbot.new.tsx
+./routes/api
+./routes/api/apolloClient.ts
+./routes/api/chatbot.$id.tsx
+./routes/api/embed.$id.tsx
+./routes/docs.jsx
+./routes/kinde-auth.$index.tsx
+./routes/checkout.tsx
+./routes/chatbot.$id.customize.tsx
+./routes/pricing.tsx
+./routes/_index.tsx
+./routes/profile.tsx
+./routes/logout.tsx
+./routes/_404.tsx
+./routes/cpanel.tsx
+./routes/chatbot.$id._index.tsx
+./routes/login.tsx
+./routes/admin.tsx
+./routes/register.tsx
+./types
+./types/types.ts
+./utils
+./utils/gemini.server.ts
+./utils/prisma.server.ts
+./utils/embed.server.ts
+./utils/usage.server.ts
+./utils/astra.server.ts
+./utils/code-generation.server.ts
+./utils/redis.server.ts
+./utils/auth.server.ts
+./utils/logger.server.ts
+./root.tsx
+// app/entry.client.tsx
+import { hydrateRoot } from "react-dom/client";
+import { RemixBrowser } from "@remix-run/react";
+import { ApolloClient, InMemoryCache, ApolloProvider } from "@apollo/client";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { isAuthenticated } = await getKindeSession(request);
-  if (await isAuthenticated()) throw redirect("/profile");
-  return json({});
+const client = new ApolloClient({
+  uri: "/api/graphql",
+  cache: new InMemoryCache(),
+});
+
+hydrateRoot(
+  document,
+  <ApolloProvider client={client}>
+    <RemixBrowser />
+  </ApolloProvider>
+);import { useState, useEffect } from "react";
+
+interface ChatSettings {
+  brandColor: string;
+  chatBackground: string;
+  chatOpacity: number;
+  chatBorderRadius: number;
+  customLogo?: string;
+  fontSize: number;
+  fontFamily: string;
+  chatWidth: number;
+  chatHeight: number;
+  showEmailCapture: boolean;
+  emailPlaceholder: string;
+  quickReplies: Array<{ text: string; action: string }>;
+  capturedEmail?: string;
+}
+
+export function useChatSettings() {
+  const [settings, setSettings] = useState<ChatSettings>(() => {
+    // Load initial settings from localStorage or defaults
+    const saved = localStorage.getItem("chatSettings");
+    return saved
+      ? JSON.parse(saved)
+      : {
+          brandColor: "#2563eb",
+          chatBackground: "#ffffff",
+          chatOpacity: 1.0,
+          chatBorderRadius: 8,
+          customLogo: undefined,
+          fontSize: 16,
+          fontFamily: "Inter",
+          chatWidth: 400,
+          chatHeight: 600,
+          showEmailCapture: false,
+          emailPlaceholder: "Enter your email...",
+          quickReplies: [],
+          capturedEmail: undefined,
+        };
+  });
+
+  useEffect(() => {
+    // Persist settings to localStorage
+    localStorage.setItem("chatSettings", JSON.stringify(settings));
+  }, [settings]);
+
+  return {
+    brandColor: settings.brandColor,
+    setBrandColor: (value: string) => setSettings((prev) => ({ ...prev, brandColor: value })),
+    chatBackground: settings.chatBackground,
+    setChatBackground: (value: string) => setSettings((prev) => ({ ...prev, chatBackground: value })),
+    chatOpacity: settings.chatOpacity,
+    setChatOpacity: (value: number) => setSettings((prev) => ({ ...prev, chatOpacity: value })),
+    chatBorderRadius: settings.chatBorderRadius,
+    setChatBorderRadius: (value: number) => setSettings((prev) => ({ ...prev, chatBorderRadius: value })),
+    customLogo: settings.customLogo,
+    setCustomLogo: (value?: string) => setSettings((prev) => ({ ...prev, customLogo: value })),
+    fontSize: settings.fontSize,
+    setFontSize: (value: number) => setSettings((prev) => ({ ...prev, fontSize: value })),
+    fontFamily: settings.fontFamily,
+    setFontFamily: (value: string) => setSettings((prev) => ({ ...prev, fontFamily: value })),
+    chatWidth: settings.chatWidth,
+    setChatWidth: (value: number) => setSettings((prev) => ({ ...prev, chatWidth: value })),
+    chatHeight: settings.chatHeight,
+    setChatHeight: (value: number) => setSettings((prev) => ({ ...prev, chatHeight: value })),
+    showEmailCapture: settings.showEmailCapture,
+    setShowEmailCapture: (value: boolean) => setSettings((prev) => ({ ...prev, showEmailCapture: value })),
+    emailPlaceholder: settings.emailPlaceholder,
+    setEmailPlaceholder: (value: string) => setSettings((prev) => ({ ...prev, emailPlaceholder: value })),
+    quickReplies: settings.quickReplies,
+    setQuickReplies: (value: Array<{ text: string; action: string }>) =>
+      setSettings((prev) => ({ ...prev, quickReplies: value })),
+    capturedEmail: settings.capturedEmail,
+    setCapturedEmail: (value?: string) => setSettings((prev) => ({ ...prev, capturedEmail: value })),
+  };
+}// components/ChatInterface.tsx
+import { useState } from 'react'
+
+export const ChatInterface = () => {
+  const [messages, setMessages] = useState<Array<{content: string, isBot: boolean}>>([])
+  const [input, setInput] = useState('')
+
+  const staticResponses = {
+    greeting: 'Hello! How can I help you?',
+    farewell: 'Goodbye! Have a great day!',
+    help: 'Here are some things I can help with: [options]'
+  }
+
+  const handleSend = () => {
+    if (!input.trim()) return
+    
+    // Add user message
+    setMessages(prev => [...prev, {content: input, isBot: false}])
+    
+    // Add bot response
+    const response = getBotResponse(input)
+    setMessages(prev => [...prev, {content: response, isBot: true}])
+    
+    setInput('')
+  }
+
+  const getBotResponse = (message: string) => {
+    const lowerMsg = message.toLowerCase()
+    return staticResponses[
+      lowerMsg.includes('hello') ? 'greeting' :
+      lowerMsg.includes('bye') ? 'farewell' : 'help'
+    ]
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="h-64 overflow-y-auto">
+        {messages.map((msg, i) => (
+          <div key={i} className={`chat ${msg.isBot ? 'chat-start' : 'chat-end'}`}>
+            <div className={`chat-bubble ${msg.isBot ? 'bg-neutral' : 'bg-primary'}`}>
+              {msg.content}
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      <div className="join w-full">
+        <input
+          type="text"
+          className="input input-bordered join-item flex-1"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+        />
+        <button onClick={handleSend} className="btn btn-primary join-item">
+          Send
+        </button>
+      </div>
+    </div>
+  )
+}// app/components/ErrorComponent.tsx
+import { Link, useRouteError } from "@remix-run/react";
+import { motion } from "framer-motion";
+import type { ReactNode } from "react";
+import { Navbar } from "./layout/navbar"; // Import your Navbar component
+
+interface ErrorComponentProps {
+  status?: number;
+  title?: string;
+  message?: string;
+  children?: ReactNode;
+  authenticated?: boolean;
+}
+
+const statusMessages: Record<number, string> = {
+  400: "The request sent to the server was invalid or corrupted",
+  401: "Authentication required to access this resource",
+  403: "You don't have permission to view this content",
+  404: "The page you're looking for doesn't exist",
+  500: "Our servers encountered an unexpected condition",
+  503: "We're performing maintenance - please check back soon",
 };
 
-export default function Login() {
-  const handleClick = () => {
-    toast("Redirecting to Google sign in...");
+const defaultTitles: Record<number, string> = {
+  400: "Invalid Request",
+  401: "Authorization Required",
+  403: "Access Restricted",
+  404: "Page Not Found",
+  500: "Server Error", 
+  503: "Service Unavailable",
+};
+
+export default function ErrorComponent({
+  status,
+  title,
+  message,
+  children,
+  authenticated = false,
+}: ErrorComponentProps) {
+  const error = useRouteError();
+  const effectiveStatus = status || (error as any)?.status || 500;
+  
+  // Dynamic content resolution with fallbacks
+  const errorTitle = title || defaultTitles[effectiveStatus] || "Unexpected Error";
+  const errorMessage = message || statusMessages[effectiveStatus] || 
+    "An unexpected error occurred. Our engineering team has been notified.";
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-background/95 to-background/90">
+     
+      
+      <motion.main
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="flex items-center justify-center p-8 pt-24" // Added pt-24 for navbar spacing
+      >
+        <div className="glass neo-brutalism p-8 rounded-2xl shadow-xl w-full max-w-2xl">
+          <div className="flex flex-col md:flex-row items-center gap-8">
+            {effectiveStatus && (
+              <div className="text-8xl font-bold bg-gradient-to-r from-error to-secondary bg-clip-text text-transparent">
+                {effectiveStatus}
+              </div>
+            )}
+            
+            <div className="space-y-4 flex-1">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                {errorTitle}
+              </h1>
+              <p className="text-lg text-gray-300 leading-relaxed">
+                {errorMessage}
+              </p>
+              
+              {children && (
+                <div className="mt-4 p-4 bg-background/50 rounded-lg">
+                  {children}
+                </div>
+              )}
+              
+              <div className="mt-8 flex flex-col sm:flex-row gap-4">
+                <Link
+                  to="/"
+                  className="btn btn-primary gap-2 hover:scale-[0.98] transition-transform"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path d="M5 13h8.5l-4 4-1.414-1.414L10.172 13H5v-2h8.5l-4-4 1.414-1.414L15.5 11H19v2h-6.172l2.586 2.586L14 17.5l-5-5 5-5 1.414 1.414L12.828 11H19v2z" />
+                  </svg>
+                  Return to Home
+                </Link>
+                
+                <Link
+                  to="/support"
+                  className="btn btn-outline gap-2 hover:bg-background/20"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path d="M3 18h12v-2H3v2zM3 6v2h18V6H3zm0 7h18v-2H3v2z" />
+                  </svg>
+                  Contact Support
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </motion.main>
+    </div>
+  );
+}// components/AnalyticsChart.tsx
+import { useMemo } from 'react';
+import { Line } from 'react-chartjs-2';
+import { Chart, registerables } from 'chart.js';
+import type { AnalyticsData } from '../types/types'; // Assuming AnalyticsData type is defined
+
+Chart.register(...registerables);
+
+interface AnalyticsChartProps {
+  analyticsData: AnalyticsData[]; // Expecting an array of AnalyticsData
+}
+
+function AnalyticsChart({ analyticsData }: AnalyticsChartProps) {
+  const chartData = useMemo(() => {
+    return {
+      labels: analyticsData.map(data => data.date), // Assuming AnalyticsData has a date field
+      datasets: [
+        {
+          label: 'Messages Over Time',
+          data: analyticsData.map(data => data.messages), // Assuming AnalyticsData has a messages field
+          borderColor: 'rgb(75, 192, 192)',
+          tension: 0.1,
+        },
+      ],
+    };
+  }, [analyticsData]);
+
+  const chartOptions = useMemo(() => {
+    return {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: 'top' as const,
+        },
+        title: {
+          display: true,
+          text: 'Messages Trend',
+        },
+      },
+    };
+  }, []);
+
+  return <Line options={chartOptions} data={chartData} />;
+}
+
+export default AnalyticsChart;interface TabProps {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+}
+
+const Tab = ({ id, label, icon, activeTab, setActiveTab }: TabProps) => {
+  const isActive = activeTab === id;
+  return (
+    <button
+      onClick={() => setActiveTab(id)}
+      className={`flex items-center space-x-2 px-4 py-2 rounded-lg ${
+        isActive ? "bg-primary text-white" : "text-gray-400 hover:text-white"
+      }`}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
+};
+
+export default Tab;
+// components/Skeleton.tsx
+export default function Skeleton({ lines = 3 }: { lines?: number }) {
+  return (
+    <div className="animate-pulse space-y-4">
+      {Array.from({ length: lines }).map((_, i) => (
+        <div
+          key={i}
+          className="h-4 bg-gray-200 rounded"
+          style={{
+            width: `${Math.random() * 50 + 50}%`, // Width between 50% and 100%
+            backgroundColor: i % 2 === 0 ? 'bg-gray-300' : 'bg-gray-200' // Alternate colors
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+import { useState } from "react";
+import { ChatPreview } from "./chatPreview";
+import { ChatSettings, Message } from "~/types/types";
+
+interface ChatTogglerProps {
+  settings: ChatSettings;
+  messages: Message[];
+  onSendMessage: (message: string) => void;
+  isLoading?: boolean;
+}
+
+export const ChatToggler = ({ settings, messages, onSendMessage, isLoading }: ChatTogglerProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="fixed bottom-4 right-4 z-50">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="btn btn-circle btn-primary shadow-lg text-2xl"
+      >
+        {isOpen ? "×" : "💬"}
+      </button>
+      {isOpen && (
+        <div className="mt-2">
+          <ChatPreview
+            settings={settings}
+            messages={messages}
+            onSendMessage={onSendMessage}
+            isLoading={isLoading}
+          />
+        </div>
+      )}
+    </div>
+  );
+};// app/components/layout/navbar.tsx
+import { useState } from "react";
+import { Link } from "@remix-run/react";
+import { Menu, X, LogOut } from "lucide-react";
+import { motion } from "framer-motion";
+
+export const Navbar = () => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [hoveredPath, setHoveredPath] = useState("");
+
+  return (
+    <nav className="navbar bg-gradient-to-b from-background/95 to-background/90 shadow-lg glass neo-brutalism">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between h-16">
+          <div className="flex">
+            <Link to="/" className="flex-shrink-0 flex items-center">
+              <span className="text-xl font-bold bg-gradient-to-r from-primary via-secondary to-primary bg-[200%_auto] animate-gradient-rotate bg-clip-text text-transparent">
+                ChatBuilder
+              </span>
+            </Link>
+          </div>
+          <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+            <Link
+              to="/docs"
+              className="neo-brutalism inline-flex items-center gap-2 text-gray-300 hover:text-white px-3 py-2 rounded-xl text-sm font-medium"
+              onMouseEnter={() => setHoveredPath("/docs")}
+              onMouseLeave={() => setHoveredPath("")}
+            >
+              Docs
+              {hoveredPath === "/docs" && (
+                <motion.div
+                  layoutId="navbar-hover"
+                  className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-xl glass"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                />
+              )}
+            </Link>
+            <Link
+              to="/pricing"
+              className="neo-brutalism inline-flex items-center gap-2 text-gray-300 hover:text-white px-3 py-2 rounded-xl text-sm font-medium"
+              onMouseEnter={() => setHoveredPath("/pricing")}
+              onMouseLeave={() => setHoveredPath("")}
+            >
+              Pricing
+              {hoveredPath === "/pricing" && (
+                <motion.div
+                  layoutId="navbar-hover"
+                  className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-xl glass"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                />
+              )}
+            </Link>
+            <Link
+              to="/dashboard"
+              className="neo-brutalism inline-flex items-center gap-2 text-gray-300 hover:text-white px-3 py-2 rounded-xl text-sm font-medium"
+              onMouseEnter={() => setHoveredPath("/dashboard")}
+              onMouseLeave={() => setHoveredPath("")}
+            >
+              Dashboard
+              {hoveredPath === "/dashboard" && (
+                <motion.div
+                  layoutId="navbar-hover"
+                  className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-xl glass"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                />
+              )}
+            </Link>
+            <Link
+              to="/logout"
+              className="neo-brutalism inline-flex items-center gap-2 text-gray-300 hover:text-white px-3 py-2 rounded-xl text-sm font-medium"
+              onMouseEnter={() => setHoveredPath("/logout")}
+              onMouseOut={() => setHoveredPath("")}
+            >
+              <LogOut className="w-5 h-5" />
+              Logout
+              {hoveredPath === "/logout" && (
+                <motion.div
+                  layoutId="navbar-hover"
+                  className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-xl glass"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                />
+              )}
+            </Link>
+          </div>
+          <div className="flex items-center sm:hidden">
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className="neo-brutalism inline-flex items-center gap-2 btn btn-ghost btn-square"
+            >
+              {isOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="sm:hidden bg-gradient-to-b from-background/95 to-background/90 glass neo-brutalism">
+          <div className="pt-2 pb-3 space-y-1">
+            <Link to="/docs" className="neo-brutalism inline-flex items-center gap-2 px-3 py-2 text-base font-medium text-gray-300 hover:text-white">
+              Docs
+            </Link>
+            <Link to="/pricing" className="neo-brutalism inline-flex items-center gap-2 px-3 py-2 text-base font-medium text-gray-300 hover:text-white">
+              Pricing
+            </Link>
+            <Link to="/dashboard" className="neo-brutalism inline-flex items-center gap-2 px-3 py-2 text-base font-medium text-gray-300 hover:text-white">
+              Dashboard
+            </Link>
+            <Link to="/logout" className="neo-brutalism inline-flex items-center gap-2 px-3 py-2 text-base font-medium text-gray-300 hover:text-white">
+              <LogOut className="w-5 h-5" />
+              Logout
+            </Link>
+          </div>
+        </div>
+      )}
+    </nav>
+  );
+};// app/components/PromptEditor.tsx
+import { useState } from "react";
+import toast from "react-hot-toast";
+
+const PromptEditor = () => {
+  const [prompts, setPrompts] = useState([{ trigger: "", response: "" }]);
+  const [suggestions] = useState([
+    { trigger: "greeting", response: "Hello! How can I help you today?" },
+    { trigger: "farewell", response: "Goodbye! Have a great day!" }
+  ]);
+
+  const addPrompt = () => {
+    setPrompts([...prompts, { trigger: "", response: "" }]);
+  };
+
+  const removePrompt = (index: number) => {
+    setPrompts(prompts.filter((_, i) => i !== index));
+  };
+
+  const handlePromptSave = () => {
+    if (prompts.some(p => !p.trigger.trim() || !p.response.trim())) {
+      toast.error('All prompts require both trigger and response');
+      return;
+    }
+    toast.success('Prompts saved successfully');
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background/95 to-background/90 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.1)_0,transparent_70%)]" />
-      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
-        <div className="hidden lg:block absolute inset-0 overflow-hidden">
-          <div className="parallax-layer absolute inset-0">
-            <div className="cube-1"></div>
-            <div className="cube-2"></div>
-            <div className="cube-3"></div>
+    <div className="card bg-base-200 shadow-xl p-6">
+      <h3 className="text-xl font-bold mb-4">Prompt Engineering</h3>
+      
+      <div className="grid gap-4">
+        {prompts.map((prompt, index) => (
+          <div key={index} className="flex gap-2 items-center">
+            <input
+              type="text"
+              placeholder="Trigger"
+              value={prompt.trigger}
+              onChange={(e) => setPrompts(
+                prompts.map((p, i) => 
+                  i === index ? { ...p, trigger: e.target.value } : p
+                )
+              )}
+              className="input input-bordered flex-1"
+            />
+            <input
+              type="text"
+              placeholder="Response"
+              value={prompt.response}
+              onChange={(e) => setPrompts(
+                prompts.map((p, i) => 
+                  i === index ? { ...p, response: e.target.value } : p
+                )
+              )}
+              className="input input-bordered flex-1"
+            />
+            <button 
+              onClick={() => removePrompt(index)}
+              className="btn btn-circle btn-error btn-sm"
+            >
+              ✕
+            </button>
           </div>
-        </div>
-        <h2 className="text-center text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-          Welcome back
-        </h2>
+        ))}
       </div>
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
-        <div className="glass-card py-8 px-4 shadow-2xl sm:rounded-2xl sm:px-10">
-          <Link
-            to="/kinde-auth/login?connection_id=conn_0190c847b77996ef9532a4f639f1bd5a"
-            onClick={handleClick}
-            className="neo-brutalism w-full flex justify-center items-center gap-2 py-2 px-4 bg-primary text-slate-900 text-sm font-medium rounded-xl"
-          >
-            Sign in with Google <ArrowRight className="w-4 h-4" />
-          </Link>
-          <div className="mt-6">
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 text-gray-400">
-                Don't have an account?{" "}
-                <Link to="/register" className="font-medium text-primary hover:text-primary-hover">
-                  Sign up
-                </Link>
-              </span>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button onClick={addPrompt} className="btn btn-primary">
+          Add Prompt
+        </button>
+        <button onClick={handlePromptSave} className="btn btn-success">
+          Save Prompts
+        </button>
+      </div>
+
+      <div className="mt-6">
+        <h4 className="text-lg font-semibold mb-2">Suggestions</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          {suggestions.map((suggestion, index) => (
+            <div key={index} className="card bg-base-100 p-2 cursor-pointer"
+              onClick={() => setPrompts([...prompts, suggestion])}
+            >
+              <div className="font-medium">{suggestion.trigger}</div>
+              <div className="text-sm opacity-75">{suggestion.response}</div>
             </div>
-          </div>
+          ))}
         </div>
       </div>
     </div>
   );
+};
+
+export default PromptEditor;import { useState } from "react";
+import { ChatSettings, Message } from "~/types/types";
+
+interface ChatPreviewProps {
+  messages: Message[];
+  onSendMessage: (message: string) => void;
+  settings: ChatSettings;
+  isLoading?: boolean;
+}
+
+export const ChatPreview = ({ messages, onSendMessage, settings, isLoading }: ChatPreviewProps) => {
+  const [input, setInput] = useState("");
+
+  const handleSend = () => {
+    if (!input.trim()) return;
+    onSendMessage(input);
+    setInput("");
+  };
+
+  return (
+    <div
+      className="relative border rounded-lg shadow-lg overflow-hidden"
+      style={{
+        width: `${settings.chatWidth}px`,
+        height: `${settings.chatHeight}px`,
+        background: settings.chatBackground,
+        opacity: settings.chatOpacity,
+        borderRadius: `${settings.chatBorderRadius}px`,
+      }}
+    >
+      <div
+        className="p-3 flex items-center"
+        style={{ background: settings.brandColor, color: settings.headingColor }}
+      >
+        {settings.customLogo && (
+          <img src={settings.customLogo} alt="Logo" className="w-8 h-8 mr-2 rounded-full" />
+        )}
+        <h3 className="text-lg font-semibold">Chatbot</h3>
+      </div>
+      <div
+        className="p-4 overflow-y-auto"
+        style={{ height: `${settings.chatHeight - 120}px` }}
+      >
+        {messages.map((msg) => (
+          <div
+            key={msg.id}
+            className={`mb-2 p-3 rounded-lg ${msg.role === "user" ? "ml-auto" : "mr-auto"}`}
+            style={{
+              background: msg.role === "user" ? settings.userBubbleColor : settings.aiBubbleColor,
+              maxWidth: "80%",
+            }}
+          >
+            <p>{msg.content}</p>
+            <small className="text-xs text-gray-500 block mt-1">
+              {new Date(msg.createdAt).toLocaleTimeString()}
+            </small>
+          </div>
+        ))}
+        {isLoading && (
+          <div className="mb-2 p-3 rounded-lg mr-auto flex items-center" style={{ background: settings.aiBubbleColor }}>
+            <span className="loading loading-spinner mr-2"></span> Thinking...
+          </div>
+        )}
+      </div>
+      <div className="p-4 border-t">
+        <div className="flex gap-2 mb-2 flex-wrap">
+          {settings.quickReplies.map((reply, index) => (
+            <button
+              key={index}
+              className="btn btn-sm btn-outline"
+              onClick={() => onSendMessage(reply.text)}
+              style={{ background: settings.brandColor, color: "#fff" }}
+            >
+              {reply.text}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyPress={(e) => e.key === "Enter" && handleSend()}
+            className="input input-bordered flex-1"
+            placeholder="Type a message..."
+          />
+          <button onClick={handleSend} className="btn btn-primary">Send</button>
+        </div>
+      </div>
+    </div>
+  );
+};// components/PromptSuggestions.tsx
+export const PromptSuggestions = () => {
+    const suggestions = [
+      "How do I reset my password?",
+      "What's your return policy?",
+      "Where are you located?"
+    ]
+  
+    function handleSuggestionClick(text: string): void {
+        throw new Error("Function not implemented.")
+    }
+
+    return (
+      <div className="flex flex-wrap gap-2 mt-4">
+        {suggestions.map((text, i) => (
+          <button
+            key={i}
+            className="btn btn-xs btn-outline"
+            onClick={() => handleSuggestionClick(text)}
+          >
+            {text}
+          </button>
+        ))}
+      </div>
+    )
+  }import { config as dotenvConfig } from "dotenv";
+
+dotenvConfig();
+
+export const env = {
+  NODE_ENV: process.env.NODE_ENV || "development",
+  PORT: process.env.PORT || "3000",
+  KINDE_CLIENT_ID: process.env.KINDE_CLIENT_ID || "",
+  KINDE_CLIENT_SECRET: process.env.KINDE_CLIENT_SECRET || "",
+  KINDE_ISSUER_URL: process.env.KINDE_ISSUER_URL || "",
+  KINDE_SITE_URL: process.env.KINDE_SITE_URL || "http://localhost:5173",
+  KINDE_POST_LOGOUT_REDIRECT_URL: process.env.KINDE_POST_LOGOUT_REDIRECT_URL || "http://localhost:5173",
+  KINDE_POST_LOGIN_REDIRECT_URL: process.env.KINDE_POST_LOGIN_REDIRECT_URL || "http://localhost:5173/profile",
+  ASTRA_DB_APPLICATION_TOKEN: process.env.ASTRA_DB_APPLICATION_TOKEN || "",
+  ASTRA_DB_ENDPOINT: process.env.ASTRA_DB_ENDPOINT || "",
+  ASTRA_DB_COLLECTION: process.env.ASTRA_DB_COLLECTION || "chatbot_docs",
+  GOOGLE_API_KEY: process.env.GOOGLE_API_KEY || "",
+  UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL || "",
+  UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN || "",
+};// app/entry.server.tsx
+import { renderToString } from "react-dom/server";
+import { RemixServer } from "@remix-run/react";
+
+export default function handleRequest(
+  request: Request,
+  responseStatusCode: number,
+  responseHeaders: Headers,
+  remixContext: any
+) {
+  const markup = renderToString(<RemixServer context={remixContext} url={request.url} />);
+  responseHeaders.set("Content-Type", "text/html");
+  return new Response("<!DOCTYPE html>" + markup, {
+    status: responseStatusCode,
+    headers: responseHeaders,
+  });
+}@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+    --radius: 1rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .glass-card {
+    @apply bg-black/20 backdrop-blur-lg border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.37)];
+  }
+  
+  .neo-brutalism {
+    @apply shadow-[6px_6px_0_0_#000] border-2 border-black transition-all duration-300 hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-[3px_3px_0_0_#000];
+  }
+}
+.analytics-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+.parallax-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  will-change: transform;
+}
+
+.cube-1 {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  top: 20%;
+  left: 20%;
+  transform: rotateX(45deg) rotateY(45deg);
+  transform-style: preserve-3d;
+  animation: rotate 10s infinite linear;
+}
+
+.cube-1::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(16, 185, 129, 0.1);
+  transform: translateZ(-50px);
+}
+
+.cube-1::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(99, 102, 241, 0.1);
+  transform: rotateY(90deg) translateZ(-50px);
+}
+
+.cube-2 {
+  position: absolute;
+  width: 150px;
+  height: 150px;
+  top: 50%;
+  left: 50%;
+  transform: rotateX(45deg) rotateY(45deg);
+  transform-style: preserve-3d;
+  animation: rotate 15s infinite linear reverse;
+}
+
+.cube-2::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(16, 185, 129, 0.1);
+  transform: translateZ(-75px);
+}
+
+.cube-2::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(99, 102, 241, 0.1);
+  transform: rotateY(90deg) translateZ(-75px);
+}
+
+.cube-3 {
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  top: 70%;
+  left: 70%;
+  transform: rotateX(45deg) rotateY(45deg);
+  transform-style: preserve-3d;
+  animation: rotate 20s infinite linear;
+}
+
+.cube-3::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(16, 185, 129, 0.1);
+  transform: translateZ(-100px);
+}
+
+.cube-3::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(99, 102, 241, 0.1);
+  transform: rotateY(90deg) translateZ(-100px);
+}
+
+@keyframes rotate {
+  0% {
+    transform: rotateX(45deg) rotateY(0deg);
+  }
+  100% {
+    transform: rotateX(45deg) rotateY(360deg);
+  }
 }import { json, redirect, LoaderFunction } from "@remix-run/node";
 import { useLoaderData, Link } from "@remix-run/react";
 import { PlusIcon } from "lucide-react";
 import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
 import prisma from "~/utils/prisma.server";
-//import { Navbar } from "~/components/layout/navbar";
+
 import { getUserMetrics } from "~/utils/usage.server";
 
 interface LoaderData {
@@ -86,7 +984,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
-      
+     
       <div className="max-w-5xl mx-auto p-8">
         <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -149,12 +1047,1160 @@ export default function Dashboard() {
       </div>
     </div>
   );
-}// app/routes/index.tsx
+}import { useState } from "react";
+import { Form, useNavigation, redirect, useActionData } from "@remix-run/react";
+import { LoaderFunctionArgs, json, ActionFunction } from "@remix-run/node";
+import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
+import prisma from "~/utils/prisma.server";
+import { v4 as uuidv4 } from "uuid";
+import { ChatPreview } from "~/components/chatPreview";
+
+import { Logger } from "~/utils/logger.server";
+import { ChatSettings } from "~/types/types";
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const { isAuthenticated, getUser } = await getKindeSession(request);
+  if (!(await isAuthenticated()) || !getUser()) throw redirect("/login");
+  return json({});
+};
+
+export const action: ActionFunction = async ({ request }) => {
+  const { getUser } = await getKindeSession(request);
+  const user = await getUser();
+  if (!user) return json({ error: "Unauthorized" }, { status: 401 });
+
+  const formData = await request.formData();
+  const name = formData.get("name") as string;
+  const brandColor = formData.get("brandColor") as string || "#2563eb";
+  const initialMessage = formData.get("initialMessage") as string || "Hello! How can I help you today?";
+  const customLogo = formData.get("customLogo") as string | null;
+  const quickRepliesRaw = formData.get("quickReplies") as string;
+  const quickReplies = quickRepliesRaw ? JSON.parse(quickRepliesRaw) : [];
+
+  if (!name) return json({ error: "Name is required" }, { status: 400 });
+
+  try {
+    const chatbot = await prisma.chatbot.create({
+      data: {
+        name,
+        connectionString: `chtbt_${uuidv4().replace(/-/g, "")}`,
+        userId: user.id,
+        settings: {
+          create: {
+            brandColor,
+            customLogo: customLogo || null,
+            chatBackground: "#ffffff",
+            chatOpacity: 1.0,
+            chatBorderRadius: 8,
+            chatWidth: 400,
+            chatHeight: 600,
+            showEmailCapture: false,
+            emailPlaceholder: "Enter your email",
+            quickReplies,
+            userBubbleColor: "#e0e0e0",
+            aiBubbleColor: "#2563eb",
+            headingColor: "#000000",
+          },
+        },
+        conversations: {
+          create: [{ messages: { create: [{ content: initialMessage, role: "system" }] } }],
+        },
+      },
+    });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.chatSettings.update({
+        where: { chatbotId: chatbot.id },
+        data: { chatbotId: chatbot.id },
+      });
+    });
+
+    Logger.info("Chatbot created", { chatbotId: chatbot.id });
+    return redirect("/dashboard");
+  } catch (error) {
+    Logger.error("Error creating chatbot", { error });
+    return json({ error: "Failed to create chatbot" }, { status: 500 });
+  }
+};
+
+export default function NewChatbot() {
+  const navigation = useNavigation();
+  const actionData = useActionData<typeof action>();
+  const isSubmitting = navigation.state === "submitting";
+  const [brandColor, setBrandColor] = useState("#2563eb");
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [initialMessage, setInitialMessage] = useState("Hello! How can I help you today?");
+  const [quickReplies, setQuickReplies] = useState<Array<{ text: string; action: string }>>([]);
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => setLogoPreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const addQuickReply = () => setQuickReplies([...quickReplies, { text: "", action: "" }]);
+  const removeQuickReply = (index: number) => setQuickReplies(quickReplies.filter((_, i) => i !== index));
+  const handleQuickReplyChange = (index: number, field: keyof { text: string; action: string }, value: string) => {
+    const newReplies = [...quickReplies];
+    newReplies[index][field] = value;
+    setQuickReplies(newReplies);
+  };
+
+  const previewSettings: ChatSettings = {
+    chatbotId: "preview-id",
+    chatWidth: 400,
+    chatHeight: 600,
+    chatBackground: "#ffffff",
+    chatOpacity: 1.0,
+    chatBorderRadius: 8,
+    brandColor,
+    customLogo: logoPreview || null,
+    showEmailCapture: false,
+    emailPlaceholder: "Enter your email",
+    quickReplies,
+    userBubbleColor: "#e0e0e0",
+    aiBubbleColor: "#2563eb",
+    headingColor: "#000000",
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-white">
+      
+      <div className="max-w-5xl mx-auto p-8">
+        <h1 className="text-3xl font-bold mb-6">Create New Chatbot</h1>
+        {actionData?.error && <div className="alert alert-error mb-4">{actionData.error}</div>}
+        <Form method="post" className="space-y-6" encType="multipart/form-data">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-gray-800 p-6 rounded-lg shadow">
+              <h2 className="text-xl font-semibold mb-4">Basic Information</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm">Chatbot Name</label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="input input-bordered w-full"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm">Brand Color</label>
+                  <input
+                    type="color"
+                    name="brandColor"
+                    value={brandColor}
+                    onChange={(e) => setBrandColor(e.target.value)}
+                    className="w-20 h-12"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm">Logo</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoChange}
+                    className="file-input file-input-bordered w-full"
+                  />
+                  {logoPreview && <img src={logoPreview} alt="Preview" className="mt-2 w-16 h-16 rounded" />}
+                  <input type="hidden" name="customLogo" value={logoPreview || ""} />
+                </div>
+              </div>
+            </div>
+            <div className="bg-gray-800 p-6 rounded-lg shadow">
+              <h2 className="text-xl font-semibold mb-4">Initial Setup</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm">Welcome Message</label>
+                  <textarea
+                    name="initialMessage"
+                    value={initialMessage}
+                    onChange={(e) => setInitialMessage(e.target.value)}
+                    className="textarea textarea-bordered w-full h-24"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm">Quick Replies</label>
+                  {quickReplies.map((reply, index) => (
+                    <div key={index} className="flex gap-2 mb-2">
+                      <input
+                        type="text"
+                        value={reply.text}
+                        onChange={(e) => handleQuickReplyChange(index, "text", e.target.value)}
+                        className="input input-bordered flex-1"
+                        placeholder="Text"
+                      />
+                      <input
+                        type="text"
+                        value={reply.action}
+                        onChange={(e) => handleQuickReplyChange(index, "action", e.target.value)}
+                        className="input input-bordered w-1/3"
+                        placeholder="Action"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeQuickReply(index)}
+                        className="btn btn-error btn-sm"
+                      >
+                        X
+                      </button>
+                    </div>
+                  ))}
+                  <button type="button" onClick={addQuickReply} className="btn btn-primary btn-sm mt-2">
+                    Add Reply
+                  </button>
+                  <input type="hidden" name="quickReplies" value={JSON.stringify(quickReplies)} />
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-800 p-6 rounded-lg shadow">
+            <h2 className="text-xl font-semibold mb-4">Preview</h2>
+            <ChatPreview
+              messages={[{ id: "preview", content: initialMessage, role: "system", createdAt: new Date() }]}
+              onSendMessage={() => {}}
+              settings={previewSettings}
+            />
+          </div>
+          <div className="flex justify-end">
+            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+              {isSubmitting ? "Creating..." : "Create Chatbot"}
+            </button>
+          </div>
+        </Form>
+      </div>
+    </div>
+  );
+}// app/graphql/client.server.ts
+import { ApolloClient, InMemoryCache } from '@apollo/client';
+import { SchemaLink } from '@apollo/client/link/schema';
+import { schema } from '../../graphql/schema';
+
+// Create an Apollo Client instance with SchemaLink, passing the user context
+export function createClient(user: any) {
+  return new ApolloClient({
+    cache: new InMemoryCache(),
+    ssrMode: true, // Enable SSR mode for server-side rendering
+    link: new SchemaLink({
+      schema,
+      context: () => ({ user }), // Provide user context to resolvers
+    }),
+  });
+}// app/routes/api/chatbot.$id.tsx
+import { json, redirect } from "@remix-run/node";
+import type { ActionFunction, LoaderFunction } from "@remix-run/node";
+import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
+import { rateLimiter } from "~/utils/redis.server";
+import prisma from "~/utils/prisma.server";
+import { generateResponse } from "~/utils/gemini.server";
+
+export const loader: LoaderFunction = async ({ request, params }) => {
+  const session = await getKindeSession(request);
+  const user = await session.getUser();
+  if (!user) throw redirect("/login");
+
+  const chatbot = await prisma.chatbot.findFirst({
+    where: { id: params.id, userId: user.id },
+    include: {
+      settings: true,
+      conversations: { include: { messages: { orderBy: { createdAt: "asc" } } } },
+    },
+  });
+
+  if (!chatbot) {
+    throw json({ error: "Chatbot not found" }, { status: 404 });
+  }
+
+  return json(chatbot);
+};
+
+export const action: ActionFunction = async ({ request, params }) => {
+  const session = await getKindeSession(request);
+  const user = await session.getUser();
+  if (!user) return json({ error: "Unauthorized" }, { status: 401 });
+
+  const ip = request.headers.get("x-forwarded-for") || "127.0.0.1";
+  const { success, remaining } = await rateLimiter.limit(ip);
+  if (!success) return json({ error: "Too many requests", remaining }, { status: 429 });
+
+  const formData = await request.formData();
+  const action = formData.get("action") as string;
+
+  switch (action) {
+    case "sendMessage": {
+      const conversationId = formData.get("conversationId") as string;
+      const message = formData.get("message") as string;
+
+      if (!conversationId || !message) {
+        return json({ error: "Missing conversationId or message" }, { status: 400 });
+      }
+
+      // Verify conversation exists and belongs to the chatbot
+      const conversation = await prisma.conversation.findFirst({
+        where: { id: conversationId, chatbotId: params.id },
+        include: { messages: true },
+      });
+
+      if (!conversation) {
+        return json({ error: "Conversation not found" }, { status: 404 });
+      }
+
+      const userMessage = await prisma.message.create({
+        data: { conversationId, content: message, role: "user" },
+      });
+
+      const response = await generateResponse(
+        message,
+        conversation.messages.map((m: { role: any; content: any; }) => `${m.role}: ${m.content}`).join("\n")
+      );
+      const aiMessage = await prisma.message.create({
+        data: { conversationId, content: response(), role: "assistant" },
+      });
+
+      return json({ userMessage, aiMessage });
+    }
+    default:
+      return json({ error: "Invalid action" }, { status: 400 });
+  }
+};// app/routes/api/embed.$id.tsx
+import { json, LoaderFunctionArgs } from "@remix-run/node";
+import prisma from "~/utils/prisma.server";
+import { requireAuth } from "~/utils/auth.server";
+import { generateEmbedCode } from "~/utils/embed.server";
+import { Logger } from "~/utils/logger.server";
+import { ChatSettings, EmbedCode } from "~/types/types";
+
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+  const user = await requireAuth(request); // Now guaranteed to be non-null
+  const chatbot = await prisma.chatbot.findFirst({
+    where: { id: params.id, userId: user.id },
+    include: { settings: true },
+  });
+
+  if (!chatbot || !chatbot.settings) {
+    Logger.warn("Chatbot or settings not found", { chatbotId: params.id });
+    return json({ error: "Chatbot not found" }, { status: 404 });
+  }
+
+  const embedCode: EmbedCode = generateEmbedCode(chatbot.settings as ChatSettings, chatbot.connectionString);
+  Logger.info("Embed code generated", { chatbotId: params.id });
+  return json(embedCode);
+};import React from "react";
+import ReactMarkdown from "react-markdown";
+
+const DocumentationPage = () => {
+  const md = `
+# Custom Chatbot Documentation
+
+## Overview
+This guide provides instructions for integrating and customizing our chatbot.
+
+## Installation
+\`\`\`bash
+npm install custom-chatbot
+\`\`\`
+
+## JavaScript Integration
+\`\`\`javascript
+import { CustomChatbot } from 'custom-chatbot';
+
+const bot = new CustomChatbot({
+  botName: 'SupportBot',
+  apiUrl: 'https://api.yourdomain.com',
+  options: {
+    brandColor: '#10B981',
+    togglerSize: 56,
+    initialMessage: 'Welcome! How can I assist you?'
+  }
+});
+
+bot.init();
+\`\`\`
+
+## React Integration
+\`\`\`jsx
+import { CustomChatWidget } from 'custom-chatbot';
+
+const App = () => (
+  <CustomChatWidget
+    botName="SupportBot"
+    apiUrl="https://api.yourdomain.com"
+    brandColor="#10B981"
+    togglerSize={56}
+    quickReplies={[{ text: 'Help', action: 'showHelp' }]}
+  />
+);
+\`\`\`
+
+## API Endpoints
+| Method | Endpoint               | Description                          |
+|--------|------------------------|--------------------------------------|
+| GET    | /api/chatbots          | List all chatbots                   |
+| POST   | /api/chatbots          | Create a new chatbot                |
+| GET    | /api/chatbots/{id}     | Get chatbot details                 |
+| PUT    | /api/chatbots/{id}     | Update chatbot settings             |
+| DELETE | /api/chatbots/{id}     | Delete a chatbot                    |
+
+## Advanced Configuration
+- **Custom Styling:**
+  \`\`\`json
+  {
+    "chatWidth": 400,
+    "chatHeight": 600,
+    "fontFamily": "Arial"
+  }
+  \`\`\`
+- **Event Handlers:**
+  \`\`\`javascript
+  bot.on('message', (msg) => console.log('New message:', msg));
+  \`\`\`
+
+## Support
+Visit [Support Page](https://support.yourdomain.com) for help.
+  `;
+
+  return (
+    <div className="min-h-screen bg-base-200 text-base-content p-8">
+      <div className="max-w-4xl mx-auto">
+        <div className="prose prose-headings:text-primary prose-a:text-secondary">
+          <ReactMarkdown
+            components={{
+              h1: ({ children }) => <h1 className="text-4xl font-bold my-6">{children}</h1>,
+              h2: ({ children }) => <h2 className="text-3xl font-semibold my-5">{children}</h2>,
+              h3: ({ children }) => <h3 className="text-2xl font-medium my-4">{children}</h3>,
+              p: ({ children }) => <p className="my-3">{children}</p>,
+              ul: ({ children }) => <ul className="list-disc pl-5 my-3">{children}</ul>,
+              ol: ({ children }) => <ol className="list-decimal pl-5 my-3">{children}</ol>,
+              a: ({ children, href }) => (
+                <a className="text-secondary hover:underline" href={href}>
+                  {children}
+                </a>
+              ),
+              table: ({ children }) => (
+                <div className="overflow-x-auto">
+                  <table className="table w-full">{children}</table>
+                </div>
+              ),
+              tr: ({ children }) => <tr className="border-b border-base-300">{children}</tr>,
+              th: ({ children }) => <th className="py-2 px-4 text-left">{children}</th>,
+              td: ({ children }) => <td className="py-2 px-4">{children}</td>,
+              code({ node, inline, className, children, ...props }) {
+                return (
+                  <pre className="bg-neutral p-4 rounded-lg overflow-x-auto">
+                    <code className="text-neutral-content">{children}</code>
+                  </pre>
+                );
+              },
+            }}
+          >
+            {md}
+          </ReactMarkdown>
+        </div>
+        <div className="mt-8 flex space-x-4">
+          <button className="btn btn-primary" onClick={() => {}}>
+            Get Started
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default DocumentationPage;// app/routes/kinde-auth.$index.tsx
+import { handleAuth } from "@kinde-oss/kinde-remix-sdk";
+import type { LoaderFunctionArgs } from "@remix-run/node";
+import prisma from "~/utils/prisma.server";
+import { Logger } from "~/utils/logger.server";
+
+async function upsertUser(user: any) {
+  if (!user || !user.id) {
+    Logger.error("No user data available in upsertUser");
+    throw new Error("No user data available");
+  }
+  try {
+    const existingUser = await prisma.user.findUnique({
+      where: { email: user.email },
+    });
+    if (existingUser) {
+      await prisma.user.update({
+        where: { email: user.email },
+        data: {
+          email: user.email,
+          name: user.name || user.given_name || "",
+        },
+      });
+    } else {
+      await prisma.user.create({
+        data: {
+          kindeId: user.id,
+          email: user.email,
+          name: user.name || user.given_name || "",
+        },
+      });
+    }
+    // Store user data in local storage after upsert
+    const userData = {
+      id: user.id,
+      email: user.email,
+      name: user.name || user.given_name || "",
+    };
+    if (typeof window !== "undefined") {
+      localStorage.setItem("user", JSON.stringify(userData));
+    }
+    Logger.info("User upserted and stored in local storage", { userId: user.id, email: user.email });
+  } catch (error) {
+    Logger.error("Error saving user to database", { error });
+    throw error;
+  }
+}
+
+export async function loader({ params, request }: LoaderFunctionArgs) {
+  return await handleAuth(request, params.index, {
+    async onRedirectCallback({ user }) {
+      await upsertUser(user);
+    },
+  });
+}
+
+export async function action({ params, request }: LoaderFunctionArgs) {
+  return await handleAuth(request, params.index, {
+    async onRedirectCallback({ user }) {
+      await upsertUser(user);
+    },
+  });
+}import { useState } from "react";
+import { Form } from "@remix-run/react";
+
+
+export default function Checkout() {
+  const [showMessage, setShowMessage] = useState(false);
+
+  const handlePay = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setShowMessage(true);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-white">
+      
+      <div className="flex items-center justify-center py-12 px-4">
+        <div className="bg-gray-800 p-8 rounded-lg shadow-lg max-w-md w-full">
+          <h2 className="text-3xl font-bold mb-6 text-center">Upgrade Plan</h2>
+          <p className="text-center mb-6">You’ve reached the 10-message limit. Upgrade for unlimited access!</p>
+          <Form onSubmit={handlePay} className="space-y-4">
+            <div>
+              <label className="block text-sm">Name</label>
+              <input
+                type="text"
+                placeholder="John Doe"
+                className="input input-bordered w-full"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm">Email</label>
+              <input
+                type="email"
+                placeholder="john.doe@example.com"
+                className="input input-bordered w-full"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm">Card Number</label>
+              <input
+                type="text"
+                placeholder="1234 5678 9012 3456"
+                className="input input-bordered w-full"
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm">Expiry Date</label>
+                <input
+                  type="text"
+                  placeholder="MM/YY"
+                  className="input input-bordered w-full"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm">CVV</label>
+                <input
+                  type="text"
+                  placeholder="123"
+                  className="input input-bordered w-full"
+                  required
+                />
+              </div>
+            </div>
+            <button type="submit" className="btn btn-primary w-full">
+              Pay $29/month
+            </button>
+          </Form>
+          {showMessage && (
+            <p className="mt-4 text-center text-green-400">
+              Demo mode: No payment processed. Upgrade simulation complete!
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}import { useState } from "react";
+import { Form, useLoaderData, useNavigation, useActionData } from "@remix-run/react";
+import { LoaderFunctionArgs, redirect, json, ActionFunction } from "@remix-run/node";
+import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
+import prisma from "~/utils/prisma.server";
+import { ChatPreview } from "~/components/chatPreview";
+
+import { ChatSettings, Message } from "~/types/types";
+import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
+import { AstraDBVectorStore } from "@langchain/community/vectorstores/astradb";
+import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
+import { env } from "~/config/env";
+import { TaskType } from "@google/generative-ai";
+import pdfParse from "pdf-parse";
+import { Logger } from "~/utils/logger.server";
+
+interface LoaderData {
+  chatbot: { id: string; name: string; conversations: { messages: Message[] }[] };
+  settings: ChatSettings;
+}
+
+interface ActionData {
+  success?: boolean;
+  error?: string;
+}
+
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+  const { isAuthenticated, getUser } = await getKindeSession(request);
+  if (!(await isAuthenticated())) throw redirect("/login");
+
+  const user = await getUser();
+  if (!user) throw json({ error: "User not found" }, { status: 401 });
+
+  const chatbot = await prisma.chatbot.findFirst({
+    where: { id: params.id, userId: user.id },
+    include: { settings: true, conversations: { include: { messages: true }, take: 1 } },
+  });
+
+  if (!chatbot) throw json({ error: "Chatbot not found" }, { status: 404 });
+
+  const settings: ChatSettings = chatbot.settings
+    ? {
+        ...chatbot.settings,
+        chatbotId: chatbot.id,
+        quickReplies: Array.isArray(chatbot.settings.quickReplies)
+          ? chatbot.settings.quickReplies as { text: string; action: string }[]
+          : [],
+      }
+    : {
+        chatbotId: params.id!,
+        brandColor: "#2563eb",
+        chatBackground: "#ffffff",
+        chatOpacity: 1.0,
+        chatBorderRadius: 8,
+        customLogo: null,
+        chatWidth: 400,
+        chatHeight: 600,
+        showEmailCapture: false,
+        emailPlaceholder: "Enter your email",
+        quickReplies: [],
+        userBubbleColor: "#e0e0e0",
+        aiBubbleColor: "#2563eb",
+        headingColor: "#000000",
+      };
+
+  return json<LoaderData>({
+    chatbot: {
+      id: chatbot.id,
+      name: chatbot.name,
+      conversations: chatbot.conversations.map((conv) => ({
+        messages: conv.messages.map((msg) => ({
+          id: msg.id,
+          content: msg.content,
+          role: msg.role as "user" | "assistant" | "system",
+          createdAt: msg.createdAt,
+        })),
+      })),
+    },
+    settings,
+  });
+};
+
+export const action: ActionFunction = async ({ request, params }) => {
+  const { isAuthenticated, getUser } = await getKindeSession(request);
+  if (!(await isAuthenticated())) return json({ error: "Unauthorized" }, { status: 401 });
+
+  const user = await getUser();
+  if (!user) return json({ error: "User not found" }, { status: 401 });
+
+  const formData = await request.formData();
+  const actionType = formData.get("actionType");
+
+  if (actionType === "updateSettings") {
+    const quickReplies = formData.get("quickReplies")
+      ? JSON.parse(formData.get("quickReplies") as string)
+      : [];
+
+    const settingsData = {
+      brandColor: formData.get("brandColor") as string,
+      chatBackground: formData.get("chatBackground") as string,
+      chatOpacity: Number(formData.get("chatOpacity")),
+      chatBorderRadius: Number(formData.get("chatBorderRadius")),
+      customLogo: (formData.get("customLogo") as string) || null,
+      chatWidth: Number(formData.get("chatWidth")),
+      chatHeight: Number(formData.get("chatHeight")),
+      showEmailCapture: formData.get("showEmailCapture") === "true",
+      emailPlaceholder: formData.get("emailPlaceholder") as string,
+      quickReplies,
+      userBubbleColor: formData.get("userBubbleColor") as string,
+      aiBubbleColor: formData.get("aiBubbleColor") as string,
+      headingColor: formData.get("headingColor") as string,
+      chatbotName: formData.get("chatbotName") as string,
+    };
+
+    await prisma.$transaction(async (tx) => {
+      await tx.chatSettings.upsert({
+        where: { chatbotId: params.id },
+        create: {
+          
+          ...settingsData,
+          chatbot: {
+            connect: { id: params.id }, // Connect to the existing Chatbot with this ID
+          },
+        },
+        update: {
+          ...settingsData,
+          chatbot: {
+            connect: { id: params.id }, // Connect to the existing Chatbot with this ID
+          },
+        },
+      });
+
+      await tx.chatbot.update({
+        where: { id: params.id },
+        data: { name: settingsData.chatbotName },
+      });
+    });
+
+    Logger.info("Settings updated", { chatbotId: params.id });
+    return json<ActionData>({ success: true });
+  }
+
+  if (actionType === "uploadDocuments") {
+    const file = formData.get("document") as File;
+    if (!file) return json({ error: "No file uploaded" }, { status: 400 });
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    // Dynamically import pdf-parse to avoid SSR issues
+    const pdfParse = (await import("pdf-parse")).default;
+    const pdfData = await pdfParse(buffer);
+    const text = pdfData.text;
+
+    const splitter = new RecursiveCharacterTextSplitter({ chunkSize: 1000, chunkOverlap: 200 });
+    const docs = await splitter.createDocuments([text]);
+
+    const embeddings = new GoogleGenerativeAIEmbeddings({
+      apiKey: env.GOOGLE_API_KEY, // Note: You mentioned `GOOGLE_API_KEY` here, but your env.ts uses `GEMINI_API_KEY`. Ensure consistency.
+      modelName: "text-embedding-004",
+      taskType: TaskType.RETRIEVAL_DOCUMENT,
+    });
+
+    await AstraDBVectorStore.fromDocuments(docs, embeddings, {
+      token: env.ASTRA_DB_APPLICATION_TOKEN,
+      endpoint: env.ASTRA_DB_ENDPOINT,
+      collection: `chatbot_docs_${user.id}`,
+    });
+
+    Logger.info("Document uploaded and vectorized", { userId: user.id });
+    return json<ActionData>({ success: true });
+  }
+
+  return json({ error: "Invalid action type" }, { status: 400 });
+};
+
+export default function CustomizeChatbot() {
+  const { chatbot, settings } = useLoaderData<LoaderData>();
+  const actionData = useActionData<ActionData>();
+  const navigation = useNavigation();
+  const isSubmitting = navigation.state === "submitting";
+
+  const [brandColor, setBrandColor] = useState(settings.brandColor);
+  const [chatBackground, setChatBackground] = useState(settings.chatBackground);
+  const [chatOpacity, setChatOpacity] = useState(settings.chatOpacity);
+  const [chatBorderRadius, setChatBorderRadius] = useState(settings.chatBorderRadius);
+  const [customLogo, setCustomLogo] = useState(settings.customLogo);
+  const [chatWidth, setChatWidth] = useState(settings.chatWidth);
+  const [chatHeight, setChatHeight] = useState(settings.chatHeight);
+  const [showEmailCapture, setShowEmailCapture] = useState(settings.showEmailCapture);
+  const [emailPlaceholder, setEmailPlaceholder] = useState(settings.emailPlaceholder);
+  const [quickReplies, setQuickReplies] = useState(settings.quickReplies);
+  const [userBubbleColor, setUserBubbleColor] = useState(settings.userBubbleColor);
+  const [aiBubbleColor, setAiBubbleColor] = useState(settings.aiBubbleColor);
+  const [headingColor, setHeadingColor] = useState(settings.headingColor);
+  const [chatbotName, setChatbotName] = useState(chatbot.name);
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => setCustomLogo(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const addQuickReply = () => setQuickReplies([...quickReplies, { text: "", action: "" }]);
+  const removeQuickReply = (index: number) => setQuickReplies(quickReplies.filter((_, i) => i !== index));
+  const updateQuickReply = (index: number, field: "text" | "action", value: string) => {
+    const newReplies = [...quickReplies];
+    newReplies[index][field] = value;
+    setQuickReplies(newReplies);
+  };
+
+  const previewSettings: ChatSettings = {
+    chatbotId: chatbot.id,
+    brandColor,
+    chatBackground,
+    chatOpacity,
+    chatBorderRadius,
+    customLogo,
+    chatWidth,
+    chatHeight,
+    showEmailCapture,
+    emailPlaceholder,
+    quickReplies,
+    userBubbleColor,
+    aiBubbleColor,
+    headingColor,
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-white">
+     
+      <div className="max-w-5xl mx-auto p-8">
+        <h1 className="text-3xl font-bold mb-6">Customize: {chatbot.name}</h1>
+        {actionData?.success && <div className="alert alert-success mb-4">Settings saved!</div>}
+        {actionData?.error && <div className="alert alert-error mb-4">{actionData.error}</div>}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <Form method="post" className="space-y-6">
+              <input type="hidden" name="actionType" value="updateSettings" />
+              <input type="hidden" name="quickReplies" value={JSON.stringify(quickReplies)} />
+              <div className="bg-gray-800 p-6 rounded-lg shadow">
+                <h2 className="text-xl font-semibold mb-4">Appearance</h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm">Chatbot Name</label>
+                    <input
+                      type="text"
+                      name="chatbotName"
+                      value={chatbotName}
+                      onChange={(e) => setChatbotName(e.target.value)}
+                      className="input input-bordered w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm">Brand Color</label>
+                    <input
+                      type="color"
+                      name="brandColor"
+                      value={brandColor}
+                      onChange={(e) => setBrandColor(e.target.value)}
+                      className="w-20 h-12"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm">Chat Background</label>
+                    <input
+                      type="color"
+                      name="chatBackground"
+                      value={chatBackground}
+                      onChange={(e) => setChatBackground(e.target.value)}
+                      className="w-20 h-12"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm">User Bubble Color</label>
+                    <input
+                      type="color"
+                      name="userBubbleColor"
+                      value={userBubbleColor}
+                      onChange={(e) => setUserBubbleColor(e.target.value)}
+                      className="w-20 h-12"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm">AI Bubble Color</label>
+                    <input
+                      type="color"
+                      name="aiBubbleColor"
+                      value={aiBubbleColor}
+                      onChange={(e) => setAiBubbleColor(e.target.value)}
+                      className="w-20 h-12"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm">Heading Color</label>
+                    <input
+                      type="color"
+                      name="headingColor"
+                      value={headingColor}
+                      onChange={(e) => setHeadingColor(e.target.value)}
+                      className="w-20 h-12"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm">Logo</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      name="customLogo"
+                      onChange={handleLogoChange}
+                      className="file-input file-input-bordered w-full"
+                    />
+                    {customLogo && <img src={customLogo} alt="Logo" className="mt-2 w-16 h-16 rounded" />}
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-800 p-6 rounded-lg shadow">
+                <h2 className="text-xl font-semibold mb-4">Dimensions & Style</h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm">Width (px)</label>
+                    <input
+                      type="number"
+                      name="chatWidth"
+                      value={chatWidth}
+                      onChange={(e) => setChatWidth(Number(e.target.value))}
+                      className="input input-bordered w-full"
+                      min="300"
+                      max="800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm">Height (px)</label>
+                    <input
+                      type="number"
+                      name="chatHeight"
+                      value={chatHeight}
+                      onChange={(e) => setChatHeight(Number(e.target.value))}
+                      className="input input-bordered w-full"
+                      min="400"
+                      max="1000"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm">Border Radius (px)</label>
+                    <input
+                      type="number"
+                      name="chatBorderRadius"
+                      value={chatBorderRadius}
+                      onChange={(e) => setChatBorderRadius(Number(e.target.value))}
+                      className="input input-bordered w-full"
+                      min="0"
+                      max="50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm">Opacity (0-1)</label>
+                    <input
+                      type="number"
+                      name="chatOpacity"
+                      value={chatOpacity}
+                      onChange={(e) => setChatOpacity(Number(e.target.value))}
+                      className="input input-bordered w-full"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-800 p-6 rounded-lg shadow">
+                <h2 className="text-xl font-semibold mb-4">Quick Replies</h2>
+                {quickReplies.map((reply, index) => (
+                  <div key={index} className="flex gap-2 mb-2">
+                    <input
+                      type="text"
+                      value={reply.text}
+                      onChange={(e) => updateQuickReply(index, "text", e.target.value)}
+                      className="input input-bordered flex-1"
+                      placeholder="Text"
+                    />
+                    <input
+                      type="text"
+                      value={reply.action}
+                      onChange={(e) => updateQuickReply(index, "action", e.target.value)}
+                      className="input input-bordered w-1/3"
+                      placeholder="Action"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeQuickReply(index)}
+                      className="btn btn-error btn-sm"
+                    >
+                      X
+                    </button>
+                  </div>
+                ))}
+                <button type="button" onClick={addQuickReply} className="btn btn-primary btn-sm mt-2">
+                  Add Reply
+                </button>
+              </div>
+              <div className="flex justify-end mt-6">
+                <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+                  {isSubmitting ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </Form>
+            <Form method="post" encType="multipart/form-data" className="mt-6">
+              <input type="hidden" name="actionType" value="uploadDocuments" />
+              <div className="bg-gray-800 p-6 rounded-lg shadow">
+                <h2 className="text-xl font-semibold mb-4">Upload Documents</h2>
+                <input
+                  type="file"
+                  name="document"
+                  accept=".pdf"
+                  className="file-input file-input-bordered w-full"
+                />
+                <button type="submit" className="btn btn-primary mt-4" disabled={isSubmitting}>
+                  {isSubmitting ? "Uploading..." : "Upload Document"}
+                </button>
+              </div>
+            </Form>
+          </div>
+          <div className="bg-gray-800 p-6 rounded-lg shadow">
+            <h2 className="text-xl font-semibold mb-4">Live Preview</h2>
+            <ChatPreview
+              settings={previewSettings}
+              messages={chatbot.conversations[0]?.messages || []}
+              onSendMessage={() => {}}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}import { Check } from "lucide-react";
+import { Link } from "@remix-run/react";
+import { Navbar } from "../components/layout/navbar";
+
+const PricingTier = ({
+  name,
+  price,
+  features,
+  isPopular,
+}: {
+  name: string;
+  price: string;
+  features: string[];
+  isPopular?: boolean;
+}) => (
+  <div className={`relative p-6 bg-gray-900 rounded-2xl border ${isPopular ? 'border-purple-500' : 'border-gray-800'} backdrop-blur-xl`}>
+    {isPopular && (
+      <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 text-sm font-medium text-white bg-gradient-to-r from-purple-500 to-pink-500 rounded-full">
+        Most Popular
+      </span>
+    )}
+    <div className="text-center">
+      <h3 className="text-xl font-semibold text-white">{name}</h3>
+      <div className="mt-4 flex items-baseline justify-center">
+        <span className="text-4xl font-bold text-white">{price}</span>
+        <span className="ml-1 text-gray-400">/month</span>
+      </div>
+    </div>
+    <ul className="mt-6 space-y-4">
+      {features.map((feature, index) => (
+        <li key={index} className="flex items-center text-gray-300">
+          <Check className="h-5 w-5 text-purple-500 mr-2" />
+          {feature}
+        </li>
+      ))}
+    </ul>
+    <Link
+      to="/register"
+      className={`mt-8 block w-full px-6 py-3 text-center text-sm font-medium rounded-lg ${
+        isPopular
+          ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600'
+          : 'bg-gray-800 text-white hover:bg-gray-700'
+      } transition-all duration-200`}
+    >
+      Get Started
+    </Link>
+  </div>
+);
+
+const Pricing = () => {
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800">
+     
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+        <div className="text-center max-w-3xl mx-auto mb-16">
+          <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600 mb-4">
+            Simple, Transparent Pricing
+          </h1>
+          <p className="text-xl text-gray-400">
+            Choose the perfect plan for your chatbot needs
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-8 max-w-7xl mx-auto">
+          <PricingTier
+            name="Starter"
+            price="$29"
+            features={[
+              "1 Chatbot",
+              "Basic Analytics",
+              "Standard Templates",
+              "Email Support",
+              "5,000 Messages/mo",
+            ]}
+          />
+          <PricingTier
+            name="Professional"
+            price="$79"
+            features={[
+              "3 Chatbots",
+              "Advanced Analytics",
+              "Custom Templates",
+              "Priority Support",
+              "25,000 Messages/mo",
+            ]}
+            isPopular
+          />
+          <PricingTier
+            name="Enterprise"
+            price="$199"
+            features={[
+              "Unlimited Chatbots",
+              "Custom Analytics",
+              "Custom Integration",
+              "24/7 Support",
+              "Unlimited Messages",
+            ]}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Pricing;// app/routes/index.tsx
 import { useEffect } from "react";
 import { Link, useNavigate } from "@remix-run/react";
 import { LoaderFunctionArgs, json, redirect } from "@remix-run/node";
 import { Bot, BarChart2, Settings, ArrowRight } from "lucide-react";
 import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
+import { Navbar } from "~/components/layout/navbar";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { isAuthenticated } = await getKindeSession(request);
@@ -181,7 +2227,7 @@ export default function Index() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background/95 to-background/90 relative">
-      
+      <Navbar/>
       {/* 3D Elements */}
       <div className="hidden lg:block absolute inset-0 overflow-hidden">
         <div className="parallax-layer absolute inset-0">
@@ -258,97 +2304,6 @@ export default function Index() {
       </div>
     </div>
   );
-}import type { LoaderFunctionArgs } from "@remix-run/node";
-import { json, redirect } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
-
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  // Assume admin access is determined by an "x-admin" header.
-  const isAdmin = request.headers.get("x-admin") === "true";
-  if (!isAdmin) throw redirect("/");
-  const metrics = {
-    uptime: process.uptime(),
-    memoryUsage: process.memoryUsage(),
-    activeChatbots: 42, // placeholder value
-  };
-  return json({ metrics });
-};
-
-const Admin = () => {
-  const { metrics } = useLoaderData<typeof loader>();
-  return (
-    <div className="p-8">
-      <h2 className="text-3xl font-bold mb-4">Admin Dashboard</h2>
-      <p>Uptime: {metrics.uptime.toFixed(2)} seconds</p>
-      <p>Memory Usage: {JSON.stringify(metrics.memoryUsage)}</p>
-      <p>Active Chatbots: {metrics.activeChatbots}</p>
-    </div>
-  );
-};
-
-export default Admin;
-// app/routes/kinde-auth.$index.tsx
-import { handleAuth } from "@kinde-oss/kinde-remix-sdk";
-import type { LoaderFunctionArgs } from "@remix-run/node";
-import prisma from "~/utils/prisma.server";
-import { Logger } from "~/utils/logger.server";
-
-async function upsertUser(user: any) {
-  if (!user || !user.id) {
-    Logger.error("No user data available in upsertUser");
-    throw new Error("No user data available");
-  }
-  try {
-    const existingUser = await prisma.user.findUnique({
-      where: { email: user.email },
-    });
-    if (existingUser) {
-      await prisma.user.update({
-        where: { email: user.email },
-        data: {
-          email: user.email,
-          name: user.name || user.given_name || "",
-        },
-      });
-    } else {
-      await prisma.user.create({
-        data: {
-          kindeId: user.id,
-          email: user.email,
-          name: user.name || user.given_name || "",
-        },
-      });
-    }
-    // Store user data in local storage after upsert
-    const userData = {
-      id: user.id,
-      email: user.email,
-      name: user.name || user.given_name || "",
-    };
-    if (typeof window !== "undefined") {
-      localStorage.setItem("user", JSON.stringify(userData));
-    }
-    Logger.info("User upserted and stored in local storage", { userId: user.id, email: user.email });
-  } catch (error) {
-    Logger.error("Error saving user to database", { error });
-    throw error;
-  }
-}
-
-export async function loader({ params, request }: LoaderFunctionArgs) {
-  return await handleAuth(request, params.index, {
-    async onRedirectCallback({ user }) {
-      await upsertUser(user);
-    },
-  });
-}
-
-export async function action({ params, request }: LoaderFunctionArgs) {
-  return await handleAuth(request, params.index, {
-    async onRedirectCallback({ user }) {
-      await upsertUser(user);
-    },
-  });
 }// app/routes/profile.tsx
 import { useEffect } from "react";
 import { json, redirect, LoaderFunctionArgs } from "@remix-run/node";
@@ -492,486 +2447,24 @@ export default function Profile() {
       </div>
     </div>
   );
-}// app/routes/api/embed.$id.tsx
-import { json, LoaderFunctionArgs } from "@remix-run/node";
-import prisma from "~/utils/prisma.server";
-import { requireAuth } from "~/utils/auth.server";
-import { generateEmbedCode } from "~/utils/embed.server";
+}// app/routes/logout.tsx (create if it doesn’t exist)
+import { redirect, ActionFunction } from "@remix-run/node";
+import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
 import { Logger } from "~/utils/logger.server";
-import { ChatSettings, EmbedCode } from "~/types/types";
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const user = await requireAuth(request); // Now guaranteed to be non-null
-  const chatbot = await prisma.chatbot.findFirst({
-    where: { id: params.id, userId: user.id },
-    include: { settings: true },
-  });
-
-  if (!chatbot || !chatbot.settings) {
-    Logger.warn("Chatbot or settings not found", { chatbotId: params.id });
-    return json({ error: "Chatbot not found" }, { status: 404 });
+export const action: ActionFunction = async ({ request }) => {
+  const { logout } = await getKindeSession(request);
+  await logout();
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("user");
   }
-
-  const embedCode: EmbedCode = generateEmbedCode(chatbot.settings as ChatSettings, chatbot.connectionString);
-  Logger.info("Embed code generated", { chatbotId: params.id });
-  return json(embedCode);
-};// app/graphql/client.server.ts
-import { ApolloClient, InMemoryCache } from '@apollo/client';
-import { SchemaLink } from '@apollo/client/link/schema';
-import { schema } from '../../graphql/schema';
-
-// Create an Apollo Client instance with SchemaLink, passing the user context
-export function createClient(user: any) {
-  return new ApolloClient({
-    cache: new InMemoryCache(),
-    ssrMode: true, // Enable SSR mode for server-side rendering
-    link: new SchemaLink({
-      schema,
-      context: () => ({ user }), // Provide user context to resolvers
-    }),
-  });
-}// app/routes/api/chatbot.$id.tsx
-import { json, redirect } from "@remix-run/node";
-import type { ActionFunction, LoaderFunction } from "@remix-run/node";
-import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
-import { rateLimiter } from "~/utils/redis.server";
-import prisma from "~/utils/prisma.server";
-import { generateResponse } from "~/utils/gemini.server";
-
-export const loader: LoaderFunction = async ({ request, params }) => {
-  const session = await getKindeSession(request);
-  const user = await session.getUser();
-  if (!user) throw redirect("/login");
-
-  const chatbot = await prisma.chatbot.findFirst({
-    where: { id: params.id, userId: user.id },
-    include: {
-      settings: true,
-      conversations: { include: { messages: { orderBy: { createdAt: "asc" } } } },
-    },
-  });
-
-  if (!chatbot) {
-    throw json({ error: "Chatbot not found" }, { status: 404 });
-  }
-
-  return json(chatbot);
+  Logger.info("User logged out and local storage cleared");
+  return redirect("/");
 };
 
-export const action: ActionFunction = async ({ request, params }) => {
-  const session = await getKindeSession(request);
-  const user = await session.getUser();
-  if (!user) return json({ error: "Unauthorized" }, { status: 401 });
-
-  const ip = request.headers.get("x-forwarded-for") || "127.0.0.1";
-  const { success, remaining } = await rateLimiter.limit(ip);
-  if (!success) return json({ error: "Too many requests", remaining }, { status: 429 });
-
-  const formData = await request.formData();
-  const action = formData.get("action") as string;
-
-  switch (action) {
-    case "sendMessage": {
-      const conversationId = formData.get("conversationId") as string;
-      const message = formData.get("message") as string;
-
-      if (!conversationId || !message) {
-        return json({ error: "Missing conversationId or message" }, { status: 400 });
-      }
-
-      // Verify conversation exists and belongs to the chatbot
-      const conversation = await prisma.conversation.findFirst({
-        where: { id: conversationId, chatbotId: params.id },
-        include: { messages: true },
-      });
-
-      if (!conversation) {
-        return json({ error: "Conversation not found" }, { status: 404 });
-      }
-
-      const userMessage = await prisma.message.create({
-        data: { conversationId, content: message, role: "user" },
-      });
-
-      const response = await generateResponse(
-        message,
-        conversation.messages.map((m: { role: any; content: any; }) => `${m.role}: ${m.content}`).join("\n")
-      );
-      const aiMessage = await prisma.message.create({
-        data: { conversationId, content: response(), role: "assistant" },
-      });
-
-      return json({ userMessage, aiMessage });
-    }
-    default:
-      return json({ error: "Invalid action" }, { status: 400 });
-  }
-};// app/routes/chatbot.$id.tsx
-import { json, redirect, LoaderFunction, ActionFunction } from "@remix-run/node";
-import { useLoaderData, useFetcher } from "@remix-run/react";
-import { useState, useEffect } from "react";
-import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
-import prisma from "~/utils/prisma.server";
-import { ChatToggler } from "~/components/chatToggler";
-
-import { generateResponse } from "~/utils/gemini.server";
-import { checkRateLimit, trackUsage } from "~/utils/usage.server";
-import { Chatbot, Message } from "~/types/types";
-
-import { Line } from "react-chartjs-2";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-} from "chart.js";
-
-// Register Chart.js components
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
-
-interface LoaderData {
-  chatbot: Chatbot;
-  messageCount: number;
-  codeSnippets: { vanillaJs: string; react: string };
-  metrics: {
-    totalMessages: number;
-    totalConversations: number;
-    usage: Array<{ date: string; messages: number }>;
-  };
-}
-
-interface ActionData {
-  userMessage?: Message;
-  aiMessage?: Message;
-  error?: string;
-}
-
-export const loader: LoaderFunction = async ({ request, params }) => {
-  const session = await getKindeSession(request);
-  const user = await session.getUser();
-  if (!user) throw redirect("/login");
-
-  // Fetch the chatbot and include its settings and conversations with messages (ordered chronologically)
-  const chatbotRaw = await prisma.chatbot.findFirst({
-    where: { id: params.id, userId: user.id },
-    include: {
-      settings: true,
-      conversations: { include: { messages: { orderBy: { createdAt: "asc" } } } },
-    },
-  });
-
-  if (!chatbotRaw) throw json({ error: "Chatbot not found" }, { status: 404 });
-
-  // Transform the raw data into our type-safe Chatbot type.
-  const chatbot: Chatbot = {
-    ...chatbotRaw,
-    createdAt: chatbotRaw.createdAt || new Date(),
-    settings: chatbotRaw.settings
-      ? {
-          ...chatbotRaw.settings,
-          quickReplies: Array.isArray(chatbotRaw.settings.quickReplies)
-            ? (chatbotRaw.settings.quickReplies as { text: string; action: string }[])
-            : [],
-        }
-      : null,
-    conversations: chatbotRaw.conversations.map((conv) => ({
-      id: conv.id,
-      messages: conv.messages.map((msg) => ({
-        id: msg.id,
-        content: msg.content,
-        role: msg.role as "user" | "assistant" | "system",
-        createdAt: msg.createdAt,
-      })),
-    })),
-  };
-
-  // Count total messages (across all conversations) for metrics
-  const messageCount = await prisma.message.count({
-    where: { conversation: { chatbotId: params.id } },
-  });
-  const totalConversations = chatbot.conversations.length;
-
-  // Get usage for the last 7 days
-  const usage = await Promise.all(
-    Array.from({ length: 7 }, (_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split("T")[0];
-      return prisma.message
-        .count({
-          where: {
-            conversation: { chatbotId: params.id },
-            createdAt: {
-              gte: new Date(dateStr),
-              lte: new Date(dateStr + "T23:59:59"),
-            },
-          },
-        })
-        .then((messages) => ({ date: dateStr, messages }));
-    })
-  ).then((results) => results.reverse());
-
-  // Build dynamic code snippets for embedding (Vanilla JS and React)
-  const codeSnippets = chatbot.settings
-    ? {
-        vanillaJs: `
-<div id="chatbot" style="width: ${chatbot.settings.chatWidth}px; height: ${chatbot.settings.chatHeight}px; background: ${chatbot.settings.chatBackground}; opacity: ${chatbot.settings.chatOpacity}; border-radius: ${chatbot.settings.chatBorderRadius}px; position: fixed; bottom: 20px; right: 20px;">
-  <div style="background: ${chatbot.settings.brandColor}; color: ${chatbot.settings.headingColor}; padding: 10px; border-radius: ${chatbot.settings.chatBorderRadius}px ${chatbot.settings.chatBorderRadius}px 0 0;">
-    ${chatbot.name}
-  </div>
-  <div id="messages" style="padding: 10px; height: ${chatbot.settings.chatHeight - 100}px; overflow-y: auto;"></div>
-  <div style="padding: 10px; border-top: 1px solid #ccc;">
-    <input id="input" type="text" style="width: 80%; padding: 5px;" placeholder="Type a message..." />
-    <button onclick="sendMessage('${chatbot.connectionString}')" style="width: 18%; padding: 5px;">Send</button>
-  </div>
-</div>
-<script>
-  const messagesDiv = document.getElementById('messages');
-  function sendMessage(connectionString) {
-    const input = document.getElementById('input');
-    const message = input.value;
-    if (!message) return;
-    fetch('/api/chatbot/' + connectionString, { 
-      method: 'POST', 
-      body: JSON.stringify({ message }), 
-      headers: { 'Content-Type': 'application/json' } 
-    })
-    .then(res => res.json())
-    .then(data => {
-      messagesDiv.innerHTML += '<div style="background: ${chatbot.settings.userBubbleColor}; padding: 8px; margin: 4px 0; border-radius: 4px;">' + data.userMessage.content + '</div>';
-      messagesDiv.innerHTML += '<div style="background: ${chatbot.settings.aiBubbleColor}; padding: 8px; margin: 4px 0; border-radius: 4px;">' + data.aiMessage.content + '</div>';
-      input.value = '';
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    });
-  }
-</script>
-`.trim(),
-        react: `
-import React, { useState, useEffect, useRef } from 'react';
-
-const Chatbot = () => {
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
-  const messagesRef = useRef(null);
-
-  const sendMessage = async () => {
-    if (!input.trim()) return;
-    const res = await fetch('/api/chatbot/${chatbot.connectionString}', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: input }),
-    });
-    const data = await res.json();
-    setMessages([...messages, data.userMessage, data.aiMessage]);
-    setInput('');
-  };
-
-  useEffect(() => {
-    if (messagesRef.current) {
-      messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
-    }
-  }, [messages]);
-
-  return (
-    <div style={{ width: '${chatbot.settings.chatWidth}px', height: '${chatbot.settings.chatHeight}px', background: '${chatbot.settings.chatBackground}', opacity: ${chatbot.settings.chatOpacity}, borderRadius: '${chatbot.settings.chatBorderRadius}px', position: 'fixed', bottom: '20px', right: '20px' }}>
-      <div style={{ background: '${chatbot.settings.brandColor}', color: '${chatbot.settings.headingColor}', padding: '10px', borderRadius: '${chatbot.settings.chatBorderRadius}px ${chatbot.settings.chatBorderRadius}px 0 0' }}>
-        ${chatbot.name}
-      </div>
-      <div ref={messagesRef} style={{ padding: '10px', height: '${chatbot.settings.chatHeight - 100}px', overflowY: 'auto' }}>
-        {messages.map((msg, i) => (
-          <div key={i} style={{ background: msg.role === 'user' ? '${chatbot.settings.userBubbleColor}' : '${chatbot.settings.aiBubbleColor}', padding: '8px', margin: '4px 0', borderRadius: '4px' }}>
-            {msg.content}
-          </div>
-        ))}
-      </div>
-      <div style={{ padding: '10px', borderTop: '1px solid #ccc', display: 'flex', gap: '5px' }}>
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-          style={{ width: '80%', padding: '5px' }}
-          placeholder="Type a message..."
-        />
-        <button onClick={sendMessage} style={{ width: '18%', padding: '5px' }}>Send</button>
-      </div>
-    </div>
-  );
-};
-
-export default Chatbot;
-`.trim(),
-      }
-    : { vanillaJs: "", react: "" };
-
-  return json<LoaderData>({
-    chatbot,
-    messageCount,
-    codeSnippets,
-    metrics: { totalMessages: messageCount, totalConversations, usage },
-  });
-};
-
-export const action: ActionFunction = async ({ request, params }) => {
-  const session = await getKindeSession(request);
-  const user = await session.getUser();
-  if (!user) return json({ error: "Unauthorized" }, { status: 401 });
-
-  const messageCount = await prisma.message.count({
-    where: { conversation: { chatbotId: params.id } },
-  });
-
-  const { success } = await checkRateLimit(user.id);
-  if (!success || messageCount >= 10) {
-    return redirect("/checkout");
-  }
-
-  const formData = await request.formData();
-  const message = formData.get("message") as string;
-  const conversationId = formData.get("conversationId") as string;
-
-  const conversation = await prisma.conversation.findUnique({
-    where: { id: conversationId },
-    include: { messages: true },
-  });
-  if (!conversation)
-    return json({ error: "Conversation not found" }, { status: 404 });
-
-  const userMessage = await prisma.message.create({
-    data: { conversationId, content: message, role: "user" },
-  });
-
-  await trackUsage(params.id!, user.id);
-
-  // Prepare a context string from the conversation messages
-  const context = conversation.messages.map((m) => `${m.role}: ${m.content}`).join("\n");
-  const response = await generateResponse(message, context);
-
-  const aiMessage = await prisma.message.create({
-    data: { conversationId, content: response, role: "assistant" },
-  });
-
-  return json<ActionData>({
-    userMessage: { ...userMessage, role: "user" as const },
-    aiMessage: { ...aiMessage, role: "assistant" as const },
-  });
-};
-
-export default function ChatbotPage() {
-  const { chatbot, messageCount, codeSnippets, metrics } = useLoaderData<LoaderData>();
-  const fetcher = useFetcher<ActionData>();
-  const [messages, setMessages] = useState<Message[]>(chatbot.conversations[0]?.messages || []);
-  const [activeTab, setActiveTab] = useState<"vanillaJs" | "react">("vanillaJs");
-
-  const handleSendMessage = (msg: string) => {
-    if (!msg.trim()) return;
-    const formData = new FormData();
-    formData.append("message", msg);
-    formData.append("conversationId", chatbot.conversations[0]?.id || "");
-    fetcher.submit(formData, { method: "post" });
-  };
-
-  useEffect(() => {
-    const data = fetcher.data;
-    if (data && "userMessage" in data && "aiMessage" in data && data.userMessage && data.aiMessage) {
-      setMessages((prev) => [...prev, data.userMessage!, data.aiMessage!]);
-    }
-  }, [fetcher.data]);
-
-  const chartData = {
-    labels: metrics.usage.map((u) => u.date),
-    datasets: [
-      {
-        label: "Messages",
-        data: metrics.usage.map((u) => u.messages),
-        borderColor: "#2563eb",
-        backgroundColor: "rgba(37, 99, 235, 0.2)",
-        fill: true,
-      },
-    ],
-  };
-
-  const chartOptions = {
-    responsive: true,
-    plugins: {
-      legend: { position: "top" as const },
-      title: { display: true, text: "Message Activity (Last 7 Days)" },
-    },
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      <div className="max-w-6xl mx-auto p-8 space-y-8">
-        <h1 className="text-3xl font-bold">{chatbot.name}</h1>
-
-        {/* Metrics Section */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-gray-800 p-4 rounded-lg shadow">
-            <p className="text-sm text-gray-400">Total Messages</p>
-            <p className="text-2xl font-bold">{metrics.totalMessages}</p>
-          </div>
-          <div className="bg-gray-800 p-4 rounded-lg shadow">
-            <p className="text-sm text-gray-400">Conversations</p>
-            <p className="text-2xl font-bold">{metrics.totalConversations}</p>
-          </div>
-          <div className="bg-gray-800 p-4 rounded-lg shadow">
-            <p className="text-sm text-gray-400">Messages Used</p>
-            <p className="text-2xl font-bold">{messageCount}/10</p>
-          </div>
-        </div>
-
-        {/* Chart Section */}
-        <div className="bg-gray-800 p-6 rounded-lg shadow">
-          <Line data={chartData} options={chartOptions} />
-        </div>
-
-        {/* Chat Preview */}
-        <div className="bg-gray-800 p-6 rounded-lg shadow">
-          <h2 className="text-xl font-semibold mb-4">Chat Preview</h2>
-          <ChatToggler
-            settings={chatbot.settings!}
-            messages={messages}
-            onSendMessage={handleSendMessage}
-            isLoading={fetcher.state === "submitting"}
-          />
-        </div>
-
-        {/* Code Snippets */}
-        <div className="bg-gray-800 p-6 rounded-lg shadow">
-          <h2 className="text-xl font-semibold mb-4">Embed Code</h2>
-          <div className="tabs tabs-bordered mb-4">
-            <button
-              className={`tab ${activeTab === "vanillaJs" ? "tab-active" : ""}`}
-              onClick={() => setActiveTab("vanillaJs")}
-            >
-              Vanilla JS
-            </button>
-            <button
-              className={`tab ${activeTab === "react" ? "tab-active" : ""}`}
-              onClick={() => setActiveTab("react")}
-            >
-              React
-            </button>
-          </div>
-          <pre className="bg-gray-900 p-4 rounded-lg text-sm overflow-x-auto">
-            <code>{codeSnippets[activeTab]}</code>
-          </pre>
-          <button
-            onClick={() => navigator.clipboard.writeText(codeSnippets[activeTab])}
-            className="btn btn-outline mt-4"
-          >
-            Copy {activeTab === "vanillaJs" ? "Vanilla JS" : "React"} Code
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-// app/routes/_404.tsx
+export default function Logout() {
+  return null; // This route only handles the action
+}// app/routes/_404.tsx
 import { Link, useRouteError } from "@remix-run/react";
 import type { ErrorResponse } from "@remix-run/node";
 
@@ -1018,977 +2511,7 @@ const NotFound = () => {
 
 export default NotFound;
 
-import { Check } from "lucide-react";
-import { Link } from "@remix-run/react";
-import { Navbar } from "../components/layout/navbar";
-
-const PricingTier = ({
-  name,
-  price,
-  features,
-  isPopular,
-}: {
-  name: string;
-  price: string;
-  features: string[];
-  isPopular?: boolean;
-}) => (
-  <div className={`relative p-6 bg-gray-900 rounded-2xl border ${isPopular ? 'border-purple-500' : 'border-gray-800'} backdrop-blur-xl`}>
-    {isPopular && (
-      <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 text-sm font-medium text-white bg-gradient-to-r from-purple-500 to-pink-500 rounded-full">
-        Most Popular
-      </span>
-    )}
-    <div className="text-center">
-      <h3 className="text-xl font-semibold text-white">{name}</h3>
-      <div className="mt-4 flex items-baseline justify-center">
-        <span className="text-4xl font-bold text-white">{price}</span>
-        <span className="ml-1 text-gray-400">/month</span>
-      </div>
-    </div>
-    <ul className="mt-6 space-y-4">
-      {features.map((feature, index) => (
-        <li key={index} className="flex items-center text-gray-300">
-          <Check className="h-5 w-5 text-purple-500 mr-2" />
-          {feature}
-        </li>
-      ))}
-    </ul>
-    <Link
-      to="/register"
-      className={`mt-8 block w-full px-6 py-3 text-center text-sm font-medium rounded-lg ${
-        isPopular
-          ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600'
-          : 'bg-gray-800 text-white hover:bg-gray-700'
-      } transition-all duration-200`}
-    >
-      Get Started
-    </Link>
-  </div>
-);
-
-const Pricing = () => {
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800">
-     
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600 mb-4">
-            Simple, Transparent Pricing
-          </h1>
-          <p className="text-xl text-gray-400">
-            Choose the perfect plan for your chatbot needs
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-8 max-w-7xl mx-auto">
-          <PricingTier
-            name="Starter"
-            price="$29"
-            features={[
-              "1 Chatbot",
-              "Basic Analytics",
-              "Standard Templates",
-              "Email Support",
-              "5,000 Messages/mo",
-            ]}
-          />
-          <PricingTier
-            name="Professional"
-            price="$79"
-            features={[
-              "3 Chatbots",
-              "Advanced Analytics",
-              "Custom Templates",
-              "Priority Support",
-              "25,000 Messages/mo",
-            ]}
-            isPopular
-          />
-          <PricingTier
-            name="Enterprise"
-            price="$199"
-            features={[
-              "Unlimited Chatbots",
-              "Custom Analytics",
-              "Custom Integration",
-              "24/7 Support",
-              "Unlimited Messages",
-            ]}
-          />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default Pricing;import { useState } from "react";
-import { Form, useNavigation, redirect, useActionData } from "@remix-run/react";
-import { LoaderFunctionArgs, json, ActionFunction } from "@remix-run/node";
-import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
-import prisma from "~/utils/prisma.server";
-import { v4 as uuidv4 } from "uuid";
-import { ChatPreview } from "~/components/chatPreview";
-
-import { Logger } from "~/utils/logger.server";
-import { ChatSettings } from "~/types/types";
-
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { isAuthenticated, getUser } = await getKindeSession(request);
-  if (!(await isAuthenticated()) || !getUser()) throw redirect("/login");
-  return json({});
-};
-
-export const action: ActionFunction = async ({ request }) => {
-  const { getUser } = await getKindeSession(request);
-  const user = await getUser();
-  if (!user) return json({ error: "Unauthorized" }, { status: 401 });
-
-  const formData = await request.formData();
-  const name = formData.get("name") as string;
-  const brandColor = formData.get("brandColor") as string || "#2563eb";
-  const initialMessage = formData.get("initialMessage") as string || "Hello! How can I help you today?";
-  const customLogo = formData.get("customLogo") as string | null;
-  const quickRepliesRaw = formData.get("quickReplies") as string;
-  const quickReplies = quickRepliesRaw ? JSON.parse(quickRepliesRaw) : [];
-
-  if (!name) return json({ error: "Name is required" }, { status: 400 });
-
-  try {
-    const chatbot = await prisma.chatbot.create({
-      data: {
-        name,
-        connectionString: `chtbt_${uuidv4().replace(/-/g, "")}`,
-        userId: user.id,
-        settings: {
-          create: {
-             
-            brandColor,
-            customLogo: customLogo || null,
-            chatBackground: "#ffffff",
-            chatOpacity: 1.0,
-            chatBorderRadius: 8,
-            chatWidth: 400,
-            chatHeight: 600,
-            showEmailCapture: false,
-            emailPlaceholder: "Enter your email",
-            quickReplies,
-            userBubbleColor: "#e0e0e0",
-            aiBubbleColor: "#2563eb",
-            headingColor: "#000000",
-          },
-        },
-        conversations: {
-          create: [{ messages: { create: [{ content: initialMessage, role: "system" }] } }],
-        },
-      },
-    });
-
-    await prisma.chatSettings.update({
-      where: { chatbotId: "temp-id" },
-      data: { chatbotId: chatbot.id },
-    });
-
-    Logger.info("Chatbot created", { chatbotId: chatbot.id });
-    return redirect("/dashboard");
-  } catch (error) {
-    Logger.error("Error creating chatbot", { error });
-    return json({ error: "Failed to create chatbot" }, { status: 500 });
-  }
-};
-
-export default function NewChatbot() {
-  const navigation = useNavigation();
-  const actionData = useActionData<typeof action>();
-  const isSubmitting = navigation.state === "submitting";
-  const [brandColor, setBrandColor] = useState("#2563eb");
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  const [name, setName] = useState("");
-  const [initialMessage, setInitialMessage] = useState("Hello! How can I help you today?");
-  const [quickReplies, setQuickReplies] = useState<Array<{ text: string; action: string }>>([]);
-
-  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setLogoPreview(reader.result as string);
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const addQuickReply = () => setQuickReplies([...quickReplies, { text: "", action: "" }]);
-  const removeQuickReply = (index: number) => setQuickReplies(quickReplies.filter((_, i) => i !== index));
-  const handleQuickReplyChange = (index: number, field: keyof { text: string; action: string }, value: string) => {
-    const newReplies = [...quickReplies];
-    newReplies[index][field] = value;
-    setQuickReplies(newReplies);
-  };
-
-  const previewSettings: ChatSettings = {
-    chatbotId: "preview-id",
-    chatWidth: 400,
-    chatHeight: 600,
-    chatBackground: "#ffffff",
-    chatOpacity: 1.0,
-    chatBorderRadius: 8,
-    brandColor,
-    customLogo: logoPreview || null,
-    showEmailCapture: false,
-    emailPlaceholder: "Enter your email",
-    quickReplies,
-    userBubbleColor: "#e0e0e0",
-    aiBubbleColor: "#2563eb",
-    headingColor: "#000000",
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-900 text-white">
-     
-      <div className="max-w-5xl mx-auto p-8">
-        <h1 className="text-3xl font-bold mb-6">Create New Chatbot</h1>
-        {actionData?.error && <div className="alert alert-error mb-4">{actionData.error}</div>}
-        <Form method="post" className="space-y-6" encType="multipart/form-data">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-gray-800 p-6 rounded-lg shadow">
-              <h2 className="text-xl font-semibold mb-4">Basic Information</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm">Chatbot Name</label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="input input-bordered w-full"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm">Brand Color</label>
-                  <input
-                    type="color"
-                    name="brandColor"
-                    value={brandColor}
-                    onChange={(e) => setBrandColor(e.target.value)}
-                    className="w-20 h-12"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm">Logo</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleLogoChange}
-                    className="file-input file-input-bordered w-full"
-                  />
-                  {logoPreview && <img src={logoPreview} alt="Preview" className="mt-2 w-16 h-16 rounded" />}
-                  <input type="hidden" name="customLogo" value={logoPreview || ""} />
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-800 p-6 rounded-lg shadow">
-              <h2 className="text-xl font-semibold mb-4">Initial Setup</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm">Welcome Message</label>
-                  <textarea
-                    name="initialMessage"
-                    value={initialMessage}
-                    onChange={(e) => setInitialMessage(e.target.value)}
-                    className="textarea textarea-bordered w-full h-24"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm">Quick Replies</label>
-                  {quickReplies.map((reply, index) => (
-                    <div key={index} className="flex gap-2 mb-2">
-                      <input
-                        type="text"
-                        value={reply.text}
-                        onChange={(e) => handleQuickReplyChange(index, "text", e.target.value)}
-                        className="input input-bordered flex-1"
-                        placeholder="Text"
-                      />
-                      <input
-                        type="text"
-                        value={reply.action}
-                        onChange={(e) => handleQuickReplyChange(index, "action", e.target.value)}
-                        className="input input-bordered w-1/3"
-                        placeholder="Action"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeQuickReply(index)}
-                        className="btn btn-error btn-sm"
-                      >
-                        X
-                      </button>
-                    </div>
-                  ))}
-                  <button type="button" onClick={addQuickReply} className="btn btn-primary btn-sm mt-2">
-                    Add Reply
-                  </button>
-                  <input type="hidden" name="quickReplies" value={JSON.stringify(quickReplies)} />
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="bg-gray-800 p-6 rounded-lg shadow">
-            <h2 className="text-xl font-semibold mb-4">Preview</h2>
-            <ChatPreview
-              messages={[{ id: "preview", content: initialMessage, role: "system", createdAt: new Date() }]}
-              onSendMessage={() => {}}
-              settings={previewSettings}
-            />
-          </div>
-          <div className="flex justify-end">
-            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? "Creating..." : "Create Chatbot"}
-            </button>
-          </div>
-        </Form>
-      </div>
-    </div>
-  );
-}// app/routes/logout.tsx (create if it doesn’t exist)
-import { redirect, ActionFunction } from "@remix-run/node";
-import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
-import { Logger } from "~/utils/logger.server";
-
-export const action: ActionFunction = async ({ request }) => {
-  const { logout } = await getKindeSession(request);
-  await logout();
-  if (typeof window !== "undefined") {
-    localStorage.removeItem("user");
-  }
-  Logger.info("User logged out and local storage cleared");
-  return redirect("/");
-};
-
-export default function Logout() {
-  return null; // This route only handles the action
-}import React from "react";
-import ReactMarkdown from "react-markdown";
-
-const DocumentationPage = () => {
-  const md = `
-# Custom Chatbot Documentation
-
-## Overview
-This guide provides instructions for integrating and customizing our chatbot.
-
-## Installation
-\`\`\`bash
-npm install custom-chatbot
-\`\`\`
-
-## JavaScript Integration
-\`\`\`javascript
-import { CustomChatbot } from 'custom-chatbot';
-
-const bot = new CustomChatbot({
-  botName: 'SupportBot',
-  apiUrl: 'https://api.yourdomain.com',
-  options: {
-    brandColor: '#10B981',
-    togglerSize: 56,
-    initialMessage: 'Welcome! How can I assist you?'
-  }
-});
-
-bot.init();
-\`\`\`
-
-## React Integration
-\`\`\`jsx
-import { CustomChatWidget } from 'custom-chatbot';
-
-const App = () => (
-  <CustomChatWidget
-    botName="SupportBot"
-    apiUrl="https://api.yourdomain.com"
-    brandColor="#10B981"
-    togglerSize={56}
-    quickReplies={[{ text: 'Help', action: 'showHelp' }]}
-  />
-);
-\`\`\`
-
-## API Endpoints
-| Method | Endpoint               | Description                          |
-|--------|------------------------|--------------------------------------|
-| GET    | /api/chatbots          | List all chatbots                   |
-| POST   | /api/chatbots          | Create a new chatbot                |
-| GET    | /api/chatbots/{id}     | Get chatbot details                 |
-| PUT    | /api/chatbots/{id}     | Update chatbot settings             |
-| DELETE | /api/chatbots/{id}     | Delete a chatbot                    |
-
-## Advanced Configuration
-- **Custom Styling:**
-  \`\`\`json
-  {
-    "chatWidth": 400,
-    "chatHeight": 600,
-    "fontFamily": "Arial"
-  }
-  \`\`\`
-- **Event Handlers:**
-  \`\`\`javascript
-  bot.on('message', (msg) => console.log('New message:', msg));
-  \`\`\`
-
-## Support
-Visit [Support Page](https://support.yourdomain.com) for help.
-  `;
-
-  return (
-    <div className="min-h-screen bg-base-200 text-base-content p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="prose prose-headings:text-primary prose-a:text-secondary">
-          <ReactMarkdown
-            components={{
-              h1: ({ children }) => <h1 className="text-4xl font-bold my-6">{children}</h1>,
-              h2: ({ children }) => <h2 className="text-3xl font-semibold my-5">{children}</h2>,
-              h3: ({ children }) => <h3 className="text-2xl font-medium my-4">{children}</h3>,
-              p: ({ children }) => <p className="my-3">{children}</p>,
-              ul: ({ children }) => <ul className="list-disc pl-5 my-3">{children}</ul>,
-              ol: ({ children }) => <ol className="list-decimal pl-5 my-3">{children}</ol>,
-              a: ({ children, href }) => (
-                <a className="text-secondary hover:underline" href={href}>
-                  {children}
-                </a>
-              ),
-              table: ({ children }) => (
-                <div className="overflow-x-auto">
-                  <table className="table w-full">{children}</table>
-                </div>
-              ),
-              tr: ({ children }) => <tr className="border-b border-base-300">{children}</tr>,
-              th: ({ children }) => <th className="py-2 px-4 text-left">{children}</th>,
-              td: ({ children }) => <td className="py-2 px-4">{children}</td>,
-              code({ node, inline, className, children, ...props }) {
-                return (
-                  <pre className="bg-neutral p-4 rounded-lg overflow-x-auto">
-                    <code className="text-neutral-content">{children}</code>
-                  </pre>
-                );
-              },
-            }}
-          >
-            {md}
-          </ReactMarkdown>
-        </div>
-        <div className="mt-8 flex space-x-4">
-          <button className="btn btn-primary" onClick={() => {}}>
-            Get Started
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default DocumentationPage;// app/routes/chatbot.$id.tsx
-import { json, redirect, LoaderFunction, ActionFunction } from "@remix-run/node";
-import { useLoaderData, useFetcher } from "@remix-run/react";
-import { useState, useEffect } from "react";
-import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
-import prisma from "~/utils/prisma.server";
-import { ChatToggler } from "~/components/chatToggler";
-
-import { generateResponse } from "~/utils/gemini.server";
-import { checkRateLimit, trackUsage } from "~/utils/usage.server";
-import { Chatbot, Message } from "~/types/types";
-
-import { Line } from "react-chartjs-2";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-} from "chart.js";
-
-// Register Chart.js components
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
-
-interface LoaderData {
-  chatbot: Chatbot;
-  messageCount: number;
-  codeSnippets: { vanillaJs: string; react: string };
-  metrics: {
-    totalMessages: number;
-    totalConversations: number;
-    usage: Array<{ date: string; messages: number }>;
-  };
-}
-
-interface ActionData {
-  userMessage?: Message;
-  aiMessage?: Message;
-  error?: string;
-}
-
-export const loader: LoaderFunction = async ({ request, params }) => {
-  const session = await getKindeSession(request);
-  const user = await session.getUser();
-  if (!user) throw redirect("/login");
-
-  // Fetch the chatbot and include its settings and conversations with messages (ordered chronologically)
-  const chatbotRaw = await prisma.chatbot.findFirst({
-    where: { id: params.id, userId: user.id },
-    include: {
-      settings: true,
-      conversations: { include: { messages: { orderBy: { createdAt: "asc" } } } },
-    },
-  });
-
-  if (!chatbotRaw) throw json({ error: "Chatbot not found" }, { status: 404 });
-
-  // Transform the raw data into our type-safe Chatbot type.
-  const chatbot: Chatbot = {
-    ...chatbotRaw,
-    createdAt: chatbotRaw.createdAt || new Date(),
-    settings: chatbotRaw.settings
-      ? {
-          ...chatbotRaw.settings,
-          quickReplies: Array.isArray(chatbotRaw.settings.quickReplies)
-            ? (chatbotRaw.settings.quickReplies as { text: string; action: string }[])
-            : [],
-        }
-      : null,
-    conversations: chatbotRaw.conversations.map((conv) => ({
-      id: conv.id,
-      messages: conv.messages.map((msg) => ({
-        id: msg.id,
-        content: msg.content,
-        role: msg.role as "user" | "assistant" | "system",
-        createdAt: msg.createdAt,
-      })),
-    })),
-  };
-
-  // Count total messages (across all conversations) for metrics
-  const messageCount = await prisma.message.count({
-    where: { conversation: { chatbotId: params.id } },
-  });
-  const totalConversations = chatbot.conversations.length;
-
-  // Get usage for the last 7 days
-  const usage = await Promise.all(
-    Array.from({ length: 7 }, (_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split("T")[0];
-      return prisma.message
-        .count({
-          where: {
-            conversation: { chatbotId: params.id },
-            createdAt: {
-              gte: new Date(dateStr),
-              lte: new Date(dateStr + "T23:59:59"),
-            },
-          },
-        })
-        .then((messages) => ({ date: dateStr, messages }));
-    })
-  ).then((results) => results.reverse());
-
-  // Build dynamic code snippets for embedding (Vanilla JS and React)
-  const codeSnippets = chatbot.settings
-    ? {
-        vanillaJs: `
-<div id="chatbot" style="width: ${chatbot.settings.chatWidth}px; height: ${chatbot.settings.chatHeight}px; background: ${chatbot.settings.chatBackground}; opacity: ${chatbot.settings.chatOpacity}; border-radius: ${chatbot.settings.chatBorderRadius}px; position: fixed; bottom: 20px; right: 20px;">
-  <div style="background: ${chatbot.settings.brandColor}; color: ${chatbot.settings.headingColor}; padding: 10px; border-radius: ${chatbot.settings.chatBorderRadius}px ${chatbot.settings.chatBorderRadius}px 0 0;">
-    ${chatbot.name}
-  </div>
-  <div id="messages" style="padding: 10px; height: ${chatbot.settings.chatHeight - 100}px; overflow-y: auto;"></div>
-  <div style="padding: 10px; border-top: 1px solid #ccc;">
-    <input id="input" type="text" style="width: 80%; padding: 5px;" placeholder="Type a message..." />
-    <button onclick="sendMessage('${chatbot.connectionString}')" style="width: 18%; padding: 5px;">Send</button>
-  </div>
-</div>
-<script>
-  const messagesDiv = document.getElementById('messages');
-  function sendMessage(connectionString) {
-    const input = document.getElementById('input');
-    const message = input.value;
-    if (!message) return;
-    fetch('/api/chatbot/' + connectionString, { 
-      method: 'POST', 
-      body: JSON.stringify({ message }), 
-      headers: { 'Content-Type': 'application/json' } 
-    })
-    .then(res => res.json())
-    .then(data => {
-      messagesDiv.innerHTML += '<div style="background: ${chatbot.settings.userBubbleColor}; padding: 8px; margin: 4px 0; border-radius: 4px;">' + data.userMessage.content + '</div>';
-      messagesDiv.innerHTML += '<div style="background: ${chatbot.settings.aiBubbleColor}; padding: 8px; margin: 4px 0; border-radius: 4px;">' + data.aiMessage.content + '</div>';
-      input.value = '';
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    });
-  }
-</script>
-`.trim(),
-        react: `
-import React, { useState, useEffect, useRef } from 'react';
-
-const Chatbot = () => {
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
-  const messagesRef = useRef(null);
-
-  const sendMessage = async () => {
-    if (!input.trim()) return;
-    const res = await fetch('/api/chatbot/${chatbot.connectionString}', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: input }),
-    });
-    const data = await res.json();
-    setMessages([...messages, data.userMessage, data.aiMessage]);
-    setInput('');
-  };
-
-  useEffect(() => {
-    if (messagesRef.current) {
-      messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
-    }
-  }, [messages]);
-
-  return (
-    <div style={{ width: '${chatbot.settings.chatWidth}px', height: '${chatbot.settings.chatHeight}px', background: '${chatbot.settings.chatBackground}', opacity: ${chatbot.settings.chatOpacity}, borderRadius: '${chatbot.settings.chatBorderRadius}px', position: 'fixed', bottom: '20px', right: '20px' }}>
-      <div style={{ background: '${chatbot.settings.brandColor}', color: '${chatbot.settings.headingColor}', padding: '10px', borderRadius: '${chatbot.settings.chatBorderRadius}px ${chatbot.settings.chatBorderRadius}px 0 0' }}>
-        ${chatbot.name}
-      </div>
-      <div ref={messagesRef} style={{ padding: '10px', height: '${chatbot.settings.chatHeight - 100}px', overflowY: 'auto' }}>
-        {messages.map((msg, i) => (
-          <div key={i} style={{ background: msg.role === 'user' ? '${chatbot.settings.userBubbleColor}' : '${chatbot.settings.aiBubbleColor}', padding: '8px', margin: '4px 0', borderRadius: '4px' }}>
-            {msg.content}
-          </div>
-        ))}
-      </div>
-      <div style={{ padding: '10px', borderTop: '1px solid #ccc', display: 'flex', gap: '5px' }}>
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-          style={{ width: '80%', padding: '5px' }}
-          placeholder="Type a message..."
-        />
-        <button onClick={sendMessage} style={{ width: '18%', padding: '5px' }}>Send</button>
-      </div>
-    </div>
-  );
-};
-
-export default Chatbot;
-`.trim(),
-      }
-    : { vanillaJs: "", react: "" };
-
-  return json<LoaderData>({
-    chatbot,
-    messageCount,
-    codeSnippets,
-    metrics: { totalMessages: messageCount, totalConversations, usage },
-  });
-};
-
-export const action: ActionFunction = async ({ request, params }) => {
-  const session = await getKindeSession(request);
-  const user = await session.getUser();
-  if (!user) return json({ error: "Unauthorized" }, { status: 401 });
-
-  const messageCount = await prisma.message.count({
-    where: { conversation: { chatbotId: params.id } },
-  });
-
-  const { success } = await checkRateLimit(user.id);
-  if (!success || messageCount >= 10) {
-    return redirect("/checkout");
-  }
-
-  const formData = await request.formData();
-  const message = formData.get("message") as string;
-  const conversationId = formData.get("conversationId") as string;
-
-  const conversation = await prisma.conversation.findUnique({
-    where: { id: conversationId },
-    include: { messages: true },
-  });
-  if (!conversation)
-    return json({ error: "Conversation not found" }, { status: 404 });
-
-  const userMessage = await prisma.message.create({
-    data: { conversationId, content: message, role: "user" },
-  });
-
-  await trackUsage(params.id!, user.id);
-
-  // Prepare a context string from the conversation messages
-  const context = conversation.messages.map((m) => `${m.role}: ${m.content}`).join("\n");
-  const response = await generateResponse(message, context);
-
-  const aiMessage = await prisma.message.create({
-    data: { conversationId, content: response, role: "assistant" },
-  });
-
-  return json<ActionData>({
-    userMessage: { ...userMessage, role: "user" as const },
-    aiMessage: { ...aiMessage, role: "assistant" as const },
-  });
-};
-
-export default function ChatbotPage() {
-  const { chatbot, messageCount, codeSnippets, metrics } = useLoaderData<LoaderData>();
-  const fetcher = useFetcher<ActionData>();
-  const [messages, setMessages] = useState<Message[]>(chatbot.conversations[0]?.messages || []);
-  const [activeTab, setActiveTab] = useState<"vanillaJs" | "react">("vanillaJs");
-
-  const handleSendMessage = (msg: string) => {
-    if (!msg.trim()) return;
-    const formData = new FormData();
-    formData.append("message", msg);
-    formData.append("conversationId", chatbot.conversations[0]?.id || "");
-    fetcher.submit(formData, { method: "post" });
-  };
-
-  useEffect(() => {
-    const data = fetcher.data;
-    if (data && "userMessage" in data && "aiMessage" in data && data.userMessage && data.aiMessage) {
-      setMessages((prev) => [...prev, data.userMessage!, data.aiMessage!]);
-    }
-  }, [fetcher.data]);
-
-  const chartData = {
-    labels: metrics.usage.map((u) => u.date),
-    datasets: [
-      {
-        label: "Messages",
-        data: metrics.usage.map((u) => u.messages),
-        borderColor: "#2563eb",
-        backgroundColor: "rgba(37, 99, 235, 0.2)",
-        fill: true,
-      },
-    ],
-  };
-
-  const chartOptions = {
-    responsive: true,
-    plugins: {
-      legend: { position: "top" as const },
-      title: { display: true, text: "Message Activity (Last 7 Days)" },
-    },
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      <div className="max-w-6xl mx-auto p-8 space-y-8">
-        <h1 className="text-3xl font-bold">{chatbot.name}</h1>
-
-        {/* Metrics Section */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-gray-800 p-4 rounded-lg shadow">
-            <p className="text-sm text-gray-400">Total Messages</p>
-            <p className="text-2xl font-bold">{metrics.totalMessages}</p>
-          </div>
-          <div className="bg-gray-800 p-4 rounded-lg shadow">
-            <p className="text-sm text-gray-400">Conversations</p>
-            <p className="text-2xl font-bold">{metrics.totalConversations}</p>
-          </div>
-          <div className="bg-gray-800 p-4 rounded-lg shadow">
-            <p className="text-sm text-gray-400">Messages Used</p>
-            <p className="text-2xl font-bold">{messageCount}/10</p>
-          </div>
-        </div>
-
-        {/* Chart Section */}
-        <div className="bg-gray-800 p-6 rounded-lg shadow">
-          <Line data={chartData} options={chartOptions} />
-        </div>
-
-        {/* Chat Preview */}
-        <div className="bg-gray-800 p-6 rounded-lg shadow">
-          <h2 className="text-xl font-semibold mb-4">Chat Preview</h2>
-          <ChatToggler
-            settings={chatbot.settings!}
-            messages={messages}
-            onSendMessage={handleSendMessage}
-            isLoading={fetcher.state === "submitting"}
-          />
-        </div>
-
-        {/* Code Snippets */}
-        <div className="bg-gray-800 p-6 rounded-lg shadow">
-          <h2 className="text-xl font-semibold mb-4">Embed Code</h2>
-          <div className="tabs tabs-bordered mb-4">
-            <button
-              className={`tab ${activeTab === "vanillaJs" ? "tab-active" : ""}`}
-              onClick={() => setActiveTab("vanillaJs")}
-            >
-              Vanilla JS
-            </button>
-            <button
-              className={`tab ${activeTab === "react" ? "tab-active" : ""}`}
-              onClick={() => setActiveTab("react")}
-            >
-              React
-            </button>
-          </div>
-          <pre className="bg-gray-900 p-4 rounded-lg text-sm overflow-x-auto">
-            <code>{codeSnippets[activeTab]}</code>
-          </pre>
-          <button
-            onClick={() => navigator.clipboard.writeText(codeSnippets[activeTab])}
-            className="btn btn-outline mt-4"
-          >
-            Copy {activeTab === "vanillaJs" ? "Vanilla JS" : "React"} Code
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
-import { Link } from "@remix-run/react";
-import { toast } from "react-hot-toast";
-import { ArrowRight } from "lucide-react";
-import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
-
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { isAuthenticated } = await getKindeSession(request);
-  if (await isAuthenticated()) throw redirect("/profile");
-  return json({});
-};
-
-export default function Register() {
-  const handleClick = () => {
-    toast("Redirecting to Google sign up...");
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background/95 to-background/90 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="hidden lg:block absolute inset-0 overflow-hidden">
-        <div className="parallax-layer absolute inset-0">
-          <div className="cube-1"></div>
-          <div className="cube-2"></div>
-          <div className="cube-3"></div>
-        </div>
-      </div>
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.1)_0,transparent_70%)]" />
-      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
-        <h2 className="text-center text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-          Join us!
-        </h2>
-      </div>
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
-        <div className="glass-card py-8 px-4 shadow-2xl sm:rounded-2xl sm:px-10">
-          <Link
-            to="/kinde-auth/register?connection_id=conn_0190c847b77996ef9532a4f639f1bd5a"
-            onClick={handleClick}
-            className="neo-brutalism w-full flex justify-center items-center gap-2 py-2 px-4 bg-primary text-slate-900 text-sm font-medium rounded-xl"
-          >
-            Sign up with Google <ArrowRight className="w-4 h-4" />
-          </Link>
-          <div className="mt-6">
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 text-gray-400">
-                Already have an account?{" "}
-                <Link to="/login" className="font-medium text-primary hover:text-primary-hover">
-                  Sign in
-                </Link>
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}import { useState } from "react";
-import { Form } from "@remix-run/react";
-
-
-export default function Checkout() {
-  const [showMessage, setShowMessage] = useState(false);
-
-  const handlePay = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setShowMessage(true);
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      
-      <div className="flex items-center justify-center py-12 px-4">
-        <div className="bg-gray-800 p-8 rounded-lg shadow-lg max-w-md w-full">
-          <h2 className="text-3xl font-bold mb-6 text-center">Upgrade Plan</h2>
-          <p className="text-center mb-6">You’ve reached the 10-message limit. Upgrade for unlimited access!</p>
-          <Form onSubmit={handlePay} className="space-y-4">
-            <div>
-              <label className="block text-sm">Name</label>
-              <input
-                type="text"
-                placeholder="John Doe"
-                className="input input-bordered w-full"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm">Email</label>
-              <input
-                type="email"
-                placeholder="john.doe@example.com"
-                className="input input-bordered w-full"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm">Card Number</label>
-              <input
-                type="text"
-                placeholder="1234 5678 9012 3456"
-                className="input input-bordered w-full"
-                required
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm">Expiry Date</label>
-                <input
-                  type="text"
-                  placeholder="MM/YY"
-                  className="input input-bordered w-full"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm">CVV</label>
-                <input
-                  type="text"
-                  placeholder="123"
-                  className="input input-bordered w-full"
-                  required
-                />
-              </div>
-            </div>
-            <button type="submit" className="btn btn-primary w-full">
-              Pay $29/month
-            </button>
-          </Form>
-          {showMessage && (
-            <p className="mt-4 text-center text-green-400">
-              Demo mode: No payment processed. Upgrade simulation complete!
-            </p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}// app/routes/cpanel.tsx
+// app/routes/cpanel.tsx
 import { json, redirect, useLoaderData } from "@remix-run/react";
 import { Link } from "@remix-run/react";
 import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
@@ -2266,673 +2789,564 @@ const Cpanel = () => {
   );
 };
 
-export default Cpanel;// components/PromptSuggestions.tsx
-export const PromptSuggestions = () => {
-    const suggestions = [
-      "How do I reset my password?",
-      "What's your return policy?",
-      "Where are you located?"
-    ]
-  
-    function handleSuggestionClick(text: string): void {
-        throw new Error("Function not implemented.")
+export default Cpanel;import { json, redirect, LoaderFunction, ActionFunction } from "@remix-run/node";
+import { useLoaderData, useFetcher } from "@remix-run/react";
+import { useState, useEffect } from "react";
+import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
+import prisma from "~/utils/prisma.server";
+import { ChatToggler } from "~/components/chatToggler";
+
+import { generateResponse } from "~/utils/gemini.server";
+import { checkRateLimit, trackUsage } from "~/utils/usage.server";
+import { Chatbot, Message } from "~/types/types";
+import { Line } from "react-chartjs-2";
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from "chart.js";
+import { generateEmbedCode } from "~/utils/embed.server";
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
+
+interface LoaderData {
+  chatbot: Chatbot;
+  messageCount: number;
+  codeSnippets: { vanillaJs: string; react: string };
+  metrics: {
+    totalMessages: number;
+    totalConversations: number;
+    usage: Array<{ date: string; messages: number }>;
+  };
+}
+
+interface ActionData {
+  userMessage?: Message;
+  aiMessage?: Message;
+  error?: string;
+}
+
+export const loader: LoaderFunction = async ({ request, params }) => {
+  const session = await getKindeSession(request);
+  const user = await session.getUser();
+  if (!user) throw redirect("/login");
+
+  const chatbotRaw = await prisma.chatbot.findFirst({
+    where: { id: params.id, userId: user.id },
+    include: {
+      settings: true,
+      conversations: { include: { messages: { orderBy: { createdAt: "asc" } } } },
+    },
+  });
+
+  if (!chatbotRaw) throw json({ error: "Chatbot not found" }, { status: 404 });
+
+  const chatbot: Chatbot = {
+    ...chatbotRaw,
+    createdAt: chatbotRaw.createdAt || new Date(),
+    settings: chatbotRaw.settings
+      ? {
+          ...chatbotRaw.settings,
+          quickReplies: Array.isArray(chatbotRaw.settings.quickReplies)
+            ? chatbotRaw.settings.quickReplies as { text: string; action: string }[]
+            : [],
+        }
+      : null,
+    conversations: chatbotRaw.conversations.map((conv) => ({
+      id: conv.id,
+      messages: conv.messages.map((msg) => ({
+        id: msg.id,
+        content: msg.content,
+        role: msg.role as "user" | "assistant" | "system",
+        createdAt: msg.createdAt,
+      })),
+    })),
+  };
+
+  const messageCount = await prisma.message.count({
+    where: { conversation: { chatbotId: params.id } },
+  });
+
+  const totalConversations = chatbot.conversations.length;
+  const usage = await Promise.all(
+    Array.from({ length: 7 }, (_, i) => {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split("T")[0];
+      return prisma.message.count({
+        where: {
+          conversation: { chatbotId: params.id },
+          createdAt: { gte: new Date(dateStr), lte: new Date(dateStr + "T23:59:59") },
+        },
+      }).then((messages) => ({ date: dateStr, messages }));
+    })
+  ).then((results) => results.reverse());
+
+  const codeSnippets = chatbot.settings
+    ? generateEmbedCode(chatbot.settings, chatbot.connectionString, chatbot.name)
+    : { vanillaJs: "", react: "" };
+
+  return json<LoaderData>({
+    chatbot,
+    messageCount,
+    codeSnippets,
+    metrics: { totalMessages: messageCount, totalConversations, usage },
+  });
+};
+
+export const action: ActionFunction = async ({ request, params }) => {
+  const session = await getKindeSession(request);
+  const user = await session.getUser();
+  if (!user) return json({ error: "Unauthorized" }, { status: 401 });
+
+  const messageCount = await prisma.message.count({
+    where: { conversation: { chatbotId: params.id } },
+  });
+
+  const { success } = await checkRateLimit(user.id);
+  if (!success || messageCount >= 10) {
+    return redirect("/checkout");
+  }
+
+  const formData = await request.formData();
+  const message = formData.get("message") as string;
+  const conversationId = formData.get("conversationId") as string;
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    include: { messages: true },
+  });
+  if (!conversation) return json({ error: "Conversation not found" }, { status: 404 });
+
+  const userMessage = await prisma.message.create({
+    data: { conversationId, content: message, role: "user" },
+  });
+
+  await trackUsage(params.id!, user.id);
+
+  const context = conversation.messages.map((m) => `${m.role}: ${m.content}`).join("\n");
+  const response = await generateResponse(message, context, user.id);
+
+  const aiMessage = await prisma.message.create({
+    data: { conversationId, content: response, role: "assistant" },
+  });
+
+  return json<ActionData>({
+    userMessage: { ...userMessage, role: "user" as const },
+    aiMessage: { ...aiMessage, role: "assistant" as const },
+  });
+};
+
+export default function ChatbotPage() {
+  const { chatbot, messageCount, codeSnippets, metrics } = useLoaderData<LoaderData>();
+  const fetcher = useFetcher<ActionData>();
+  const [messages, setMessages] = useState<Message[]>(chatbot.conversations[0]?.messages || []);
+  const [activeTab, setActiveTab] = useState<"vanillaJs" | "react">("vanillaJs");
+
+  const handleSendMessage = (msg: string) => {
+    if (!msg.trim()) return;
+    const formData = new FormData();
+    formData.append("message", msg);
+    formData.append("conversationId", chatbot.conversations[0]?.id || "");
+    fetcher.submit(formData, { method: "post" });
+  };
+
+  useEffect(() => {
+    const data = fetcher.data;
+    if (data && "userMessage" in data && "aiMessage" in data && data.userMessage && data.aiMessage) {
+      setMessages((prev) => [...prev, data.userMessage!, data.aiMessage!]);
     }
+  }, [fetcher.data]);
 
-    return (
-      <div className="flex flex-wrap gap-2 mt-4">
-        {suggestions.map((text, i) => (
-          <button
-            key={i}
-            className="btn btn-xs btn-outline"
-            onClick={() => handleSuggestionClick(text)}
-          >
-            {text}
-          </button>
-        ))}
-      </div>
-    )
-  }// components/ChatInterface.tsx
-import { useState } from 'react'
-
-export const ChatInterface = () => {
-  const [messages, setMessages] = useState<Array<{content: string, isBot: boolean}>>([])
-  const [input, setInput] = useState('')
-
-  const staticResponses = {
-    greeting: 'Hello! How can I help you?',
-    farewell: 'Goodbye! Have a great day!',
-    help: 'Here are some things I can help with: [options]'
-  }
-
-  const handleSend = () => {
-    if (!input.trim()) return
-    
-    // Add user message
-    setMessages(prev => [...prev, {content: input, isBot: false}])
-    
-    // Add bot response
-    const response = getBotResponse(input)
-    setMessages(prev => [...prev, {content: response, isBot: true}])
-    
-    setInput('')
-  }
-
-  const getBotResponse = (message: string) => {
-    const lowerMsg = message.toLowerCase()
-    return staticResponses[
-      lowerMsg.includes('hello') ? 'greeting' :
-      lowerMsg.includes('bye') ? 'farewell' : 'help'
-    ]
-  }
-
+  const chartData = {
+    labels: metrics.usage.length ? metrics.usage.map((u) => u.date) : ["No Data"],
+    datasets: [
+      {
+        label: "Messages",
+        data: metrics.usage.length ? metrics.usage.map((u) => u.messages) : [0],
+        borderColor: "#2563eb",
+        backgroundColor: "rgba(37, 99, 235, 0.2)",
+        fill: true,
+      },
+    ],
+  };
+  
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: { position: "top" },
+      title: { display: true, text: "Message Activity (Last 7 Days)" },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+      },
+    },
+  };
   return (
-    <div className="space-y-4">
-      <div className="h-64 overflow-y-auto">
-        {messages.map((msg, i) => (
-          <div key={i} className={`chat ${msg.isBot ? 'chat-start' : 'chat-end'}`}>
-            <div className={`chat-bubble ${msg.isBot ? 'bg-neutral' : 'bg-primary'}`}>
-              {msg.content}
-            </div>
-          </div>
-        ))}
-      </div>
-      
-      <div className="join w-full">
-        <input
-          type="text"
-          className="input input-bordered join-item flex-1"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-        />
-        <button onClick={handleSend} className="btn btn-primary join-item">
-          Send
-        </button>
-      </div>
-    </div>
-  )
-}// app/components/layout/navbar.tsx
-import { useState } from "react";
-import { Link } from "@remix-run/react";
-import { Menu, X, LogOut } from "lucide-react";
-import { motion } from "framer-motion";
+    <div className="min-h-screen bg-gray-900 text-white">
+     
+      <div className="max-w-6xl mx-auto p-8 space-y-8">
+        <h1 className="text-3xl font-bold">{chatbot.name}</h1>
 
-export const Navbar = () => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [hoveredPath, setHoveredPath] = useState("");
+        {/* Metrics Section */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-gray-800 p-4 rounded-lg shadow">
+            <p className="text-sm text-gray-400">Total Messages</p>
+            <p className="text-2xl font-bold">{metrics.totalMessages}</p>
+          </div>
+          <div className="bg-gray-800 p-4 rounded-lg shadow">
+            <p className="text-sm text-gray-400">Conversations</p>
+            <p className="text-2xl font-bold">{metrics.totalConversations}</p>
+          </div>
+          <div className="bg-gray-800 p-4 rounded-lg shadow">
+            <p className="text-sm text-gray-400">Messages Used</p>
+            <p className="text-2xl font-bold">{messageCount}/10</p>
+          </div>
+        </div>
 
-  return (
-    <nav className="navbar bg-gradient-to-b from-background/95 to-background/90 shadow-lg glass neo-brutalism">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex">
-            <Link to="/" className="flex-shrink-0 flex items-center">
-              <span className="text-xl font-bold bg-gradient-to-r from-primary via-secondary to-primary bg-[200%_auto] animate-gradient-rotate bg-clip-text text-transparent">
-                ChatBuilder
-              </span>
-            </Link>
-          </div>
-          <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-            <Link
-              to="/docs"
-              className="neo-brutalism inline-flex items-center gap-2 text-gray-300 hover:text-white px-3 py-2 rounded-xl text-sm font-medium"
-              onMouseEnter={() => setHoveredPath("/docs")}
-              onMouseLeave={() => setHoveredPath("")}
-            >
-              Docs
-              {hoveredPath === "/docs" && (
-                <motion.div
-                  layoutId="navbar-hover"
-                  className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-xl glass"
-                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                />
-              )}
-            </Link>
-            <Link
-              to="/pricing"
-              className="neo-brutalism inline-flex items-center gap-2 text-gray-300 hover:text-white px-3 py-2 rounded-xl text-sm font-medium"
-              onMouseEnter={() => setHoveredPath("/pricing")}
-              onMouseLeave={() => setHoveredPath("")}
-            >
-              Pricing
-              {hoveredPath === "/pricing" && (
-                <motion.div
-                  layoutId="navbar-hover"
-                  className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-xl glass"
-                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                />
-              )}
-            </Link>
-            <Link
-              to="/dashboard"
-              className="neo-brutalism inline-flex items-center gap-2 text-gray-300 hover:text-white px-3 py-2 rounded-xl text-sm font-medium"
-              onMouseEnter={() => setHoveredPath("/dashboard")}
-              onMouseLeave={() => setHoveredPath("")}
-            >
-              Dashboard
-              {hoveredPath === "/dashboard" && (
-                <motion.div
-                  layoutId="navbar-hover"
-                  className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-xl glass"
-                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                />
-              )}
-            </Link>
-            <Link
-              to="/logout"
-              className="neo-brutalism inline-flex items-center gap-2 text-gray-300 hover:text-white px-3 py-2 rounded-xl text-sm font-medium"
-              onMouseEnter={() => setHoveredPath("/logout")}
-              onMouseOut={() => setHoveredPath("")}
-            >
-              <LogOut className="w-5 h-5" />
-              Logout
-              {hoveredPath === "/logout" && (
-                <motion.div
-                  layoutId="navbar-hover"
-                  className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-xl glass"
-                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                />
-              )}
-            </Link>
-          </div>
-          <div className="flex items-center sm:hidden">
+        {/* Chart Section */}
+        <div className="bg-gray-800 p-6 rounded-lg shadow">
+          <Line data={chartData} options={chartOptions as any} />
+        </div>
+
+        {/* Chat Preview */}
+        <div className="bg-gray-800 p-6 rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-4">Chat Preview</h2>
+          <ChatToggler
+            settings={chatbot.settings!}
+            messages={messages}
+            onSendMessage={handleSendMessage}
+            isLoading={fetcher.state === "submitting"}
+          />
+        </div>
+
+        {/* Code Snippets */}
+        <div className="bg-gray-800 p-6 rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-4">Embed Code</h2>
+          <div className="tabs tabs-bordered mb-4">
             <button
-              onClick={() => setIsOpen(!isOpen)}
-              className="neo-brutalism inline-flex items-center gap-2 btn btn-ghost btn-square"
+              className={`tab ${activeTab === "vanillaJs" ? "tab-active" : ""}`}
+              onClick={() => setActiveTab("vanillaJs")}
             >
-              {isOpen ? <X size={24} /> : <Menu size={24} />}
+              Vanilla JS
+            </button>
+            <button
+              className={`tab ${activeTab === "react" ? "tab-active" : ""}`}
+              onClick={() => setActiveTab("react")}
+            >
+              React
             </button>
           </div>
+          <pre className="bg-gray-900 p-4 rounded-lg text-sm overflow-x-auto">
+            <code>{codeSnippets[activeTab]}</code>
+          </pre>
+          <button
+            onClick={() => navigator.clipboard.writeText(codeSnippets[activeTab])}
+            className="btn btn-outline mt-4"
+          >
+            Copy {activeTab === "vanillaJs" ? "Vanilla JS" : "React"} Code
+          </button>
         </div>
       </div>
+    </div>
+  );
+}import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { Link } from "@remix-run/react";
+import { toast } from "react-hot-toast";
+import { ArrowRight } from "lucide-react";
+import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
 
-      {isOpen && (
-        <div className="sm:hidden bg-gradient-to-b from-background/95 to-background/90 glass neo-brutalism">
-          <div className="pt-2 pb-3 space-y-1">
-            <Link to="/docs" className="neo-brutalism inline-flex items-center gap-2 px-3 py-2 text-base font-medium text-gray-300 hover:text-white">
-              Docs
-            </Link>
-            <Link to="/pricing" className="neo-brutalism inline-flex items-center gap-2 px-3 py-2 text-base font-medium text-gray-300 hover:text-white">
-              Pricing
-            </Link>
-            <Link to="/dashboard" className="neo-brutalism inline-flex items-center gap-2 px-3 py-2 text-base font-medium text-gray-300 hover:text-white">
-              Dashboard
-            </Link>
-            <Link to="/logout" className="neo-brutalism inline-flex items-center gap-2 px-3 py-2 text-base font-medium text-gray-300 hover:text-white">
-              <LogOut className="w-5 h-5" />
-              Logout
-            </Link>
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const { isAuthenticated } = await getKindeSession(request);
+  if (await isAuthenticated()) throw redirect("/profile");
+  return json({});
+};
+
+export default function Login() {
+  const handleClick = () => {
+    toast("Redirecting to Google sign in...");
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-background via-background/95 to-background/90 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.1)_0,transparent_70%)]" />
+      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
+        <div className="hidden lg:block absolute inset-0 overflow-hidden">
+          <div className="parallax-layer absolute inset-0">
+            <div className="cube-1"></div>
+            <div className="cube-2"></div>
+            <div className="cube-3"></div>
           </div>
         </div>
-      )}
-    </nav>
+        <h2 className="text-center text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+          Welcome back
+        </h2>
+      </div>
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
+        <div className="glass-card py-8 px-4 shadow-2xl sm:rounded-2xl sm:px-10">
+          <Link
+            to="/kinde-auth/login?connection_id=conn_0190c847b77996ef9532a4f639f1bd5a"
+            onClick={handleClick}
+            className="neo-brutalism w-full flex justify-center items-center gap-2 py-2 px-4 bg-primary text-slate-900 text-sm font-medium rounded-xl"
+          >
+            Sign in with Google <ArrowRight className="w-4 h-4" />
+          </Link>
+          <div className="mt-6">
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 text-gray-400">
+                Don't have an account?{" "}
+                <Link to="/register" className="font-medium text-primary hover:text-primary-hover">
+                  Sign up
+                </Link>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
-};// app/components/PromptEditor.tsx
-import { useState } from "react";
-import toast from "react-hot-toast";
+}import type { LoaderFunctionArgs } from "@remix-run/node";
+import { json, redirect } from "@remix-run/node";
+import { useLoaderData } from "@remix-run/react";
 
-const PromptEditor = () => {
-  const [prompts, setPrompts] = useState([{ trigger: "", response: "" }]);
-  const [suggestions] = useState([
-    { trigger: "greeting", response: "Hello! How can I help you today?" },
-    { trigger: "farewell", response: "Goodbye! Have a great day!" }
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  // Assume admin access is determined by an "x-admin" header.
+  const isAdmin = request.headers.get("x-admin") === "true";
+  if (!isAdmin) throw redirect("/");
+  const metrics = {
+    uptime: process.uptime(),
+    memoryUsage: process.memoryUsage(),
+    activeChatbots: 42, // placeholder value
+  };
+  return json({ metrics });
+};
+
+const Admin = () => {
+  const { metrics } = useLoaderData<typeof loader>();
+  return (
+    <div className="p-8">
+      <h2 className="text-3xl font-bold mb-4">Admin Dashboard</h2>
+      <p>Uptime: {metrics.uptime.toFixed(2)} seconds</p>
+      <p>Memory Usage: {JSON.stringify(metrics.memoryUsage)}</p>
+      <p>Active Chatbots: {metrics.activeChatbots}</p>
+    </div>
+  );
+};
+
+export default Admin;
+import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { Link } from "@remix-run/react";
+import { toast } from "react-hot-toast";
+import { ArrowRight } from "lucide-react";
+import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const { isAuthenticated } = await getKindeSession(request);
+  if (await isAuthenticated()) throw redirect("/profile");
+  return json({});
+};
+
+export default function Register() {
+  const handleClick = () => {
+    toast("Redirecting to Google sign up...");
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-background via-background/95 to-background/90 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="hidden lg:block absolute inset-0 overflow-hidden">
+        <div className="parallax-layer absolute inset-0">
+          <div className="cube-1"></div>
+          <div className="cube-2"></div>
+          <div className="cube-3"></div>
+        </div>
+      </div>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.1)_0,transparent_70%)]" />
+      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
+        <h2 className="text-center text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+          Join us!
+        </h2>
+      </div>
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
+        <div className="glass-card py-8 px-4 shadow-2xl sm:rounded-2xl sm:px-10">
+          <Link
+            to="/kinde-auth/register?connection_id=conn_0190c847b77996ef9532a4f639f1bd5a"
+            onClick={handleClick}
+            className="neo-brutalism w-full flex justify-center items-center gap-2 py-2 px-4 bg-primary text-slate-900 text-sm font-medium rounded-xl"
+          >
+            Sign up with Google <ArrowRight className="w-4 h-4" />
+          </Link>
+          <div className="mt-6">
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 text-gray-400">
+                Already have an account?{" "}
+                <Link to="/login" className="font-medium text-primary hover:text-primary-hover">
+                  Sign in
+                </Link>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}// app/types/types.ts
+import { Prisma } from "@prisma/client";
+
+export interface ChatSettings {
+  id?: string;
+  chatbotId: string;
+  brandColor: string;
+  chatBackground: string;
+  chatOpacity: number;
+  chatBorderRadius: number;
+  customLogo?: string | null;
+  chatWidth: number;
+  chatHeight: number;
+  showEmailCapture: boolean;
+  emailPlaceholder: string;
+  quickReplies: Array<{ text: string; action: string }>;
+  userBubbleColor: string;
+  aiBubbleColor: string;
+  headingColor: string;
+}
+
+// Define a type for Prisma input
+export type ChatSettingsCreateInput = Omit<ChatSettings, "id"> & {
+  quickReplies: Prisma.JsonValue; // Prisma expects JsonValue for JSON fields
+};
+interface ChatbotWithEmbed {
+  id: string;
+  name: string;
+  connectionString: string;
+  createdAt: string;
+  settings: ChatSettings | null;
+  embed: EmbedCode;
+}export interface User {
+  id: string;
+  email: string;
+  name?: string;
+  given_name?: string;
+  family_name?: string;
+  picture?: string;
+}
+
+
+export interface EmbedCode {
+  react: string;
+  vanillaJs: string;
+}
+
+export interface Message {
+  id: string;
+  content: string;
+  role: "user" | "assistant" | "system"; // Add "system"
+  createdAt: Date | string;
+}
+
+export interface AnalyticsData {
+  date: any;
+  messages: any;
+  total_messages: number;
+  total_conversations: number;
+  usage: Array<{ date: string; messages: number }>;
+}
+
+export interface RateLimiterResponse {
+  success: boolean;
+  remaining: number;
+}
+
+export interface Chatbot {
+  id: string;
+  name: string;
+  connectionString: string;
+  userId: string;
+  createdAt: Date;
+  settings: ChatSettings | null;
+  conversations: Array<{
+    id: string;
+    messages: Message[];
+  }>;
+}// app/utils/gemini.server.ts
+import { AstraDBVectorStore } from "@langchain/community/vectorstores/astradb";
+import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
+import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { RunnableSequence, RunnableMap } from "@langchain/core/runnables";
+import { StringOutputParser } from "@langchain/core/output_parsers";
+import { PromptTemplate } from "@langchain/core/prompts";
+import { TaskType } from "@google/generative-ai";
+import { env } from "~/config/env";
+import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
+
+const embeddings = new GoogleGenerativeAIEmbeddings({
+  apiKey: env.GOOGLE_API_KEY,
+  modelName: "text-embedding-004",
+  taskType: TaskType.RETRIEVAL_DOCUMENT,
+});
+
+const llm = new ChatGoogleGenerativeAI({
+  apiKey: env.GOOGLE_API_KEY,
+  model: "gemini-1.5-pro",
+  temperature: 0.7,
+  maxRetries: 2,
+});
+
+export async function initializeVectorStore() {
+  const splitter = new RecursiveCharacterTextSplitter({ chunkSize: 1000, chunkOverlap: 200 });
+  const docs = [
+    "Chatbots are AI-powered conversational agents that assist users.",
+    "To customize your chatbot, adjust colors, sizes, and quick replies in the settings panel.",
+    "For support, contact us at support@chatbuilder.com.",
+  ];
+  const splitDocs = await splitter.createDocuments(docs);
+  await AstraDBVectorStore.fromDocuments(splitDocs, embeddings, {
+    token: env.ASTRA_DB_APPLICATION_TOKEN,
+    endpoint: env.ASTRA_DB_ENDPOINT,
+    collection: env.ASTRA_DB_COLLECTION,
+  });
+}
+
+export const generateResponse = async (message: string, context: string, id: string): Promise<string> => {
+  const vectorStore = await AstraDBVectorStore.fromExistingIndex(embeddings, {
+    token: env.ASTRA_DB_APPLICATION_TOKEN,
+    endpoint: env.ASTRA_DB_ENDPOINT,
+    collection: env.ASTRA_DB_COLLECTION,
+  });
+
+  const retriever = vectorStore.asRetriever();
+  const prompt = PromptTemplate.fromTemplate(
+    "Answer based on the following context:\n{context}\n\nQuestion: {question}"
+  );
+
+  const chain = RunnableSequence.from([
+    RunnableMap.from({
+      context: retriever.pipe((docs) => docs.map((doc) => doc.pageContent).join("\n")),
+      question: (input: string) => input, // Pass message directly
+    }),
+    prompt,
+    llm,
+    new StringOutputParser(),
   ]);
 
-  const addPrompt = () => {
-    setPrompts([...prompts, { trigger: "", response: "" }]);
-  };
-
-  const removePrompt = (index: number) => {
-    setPrompts(prompts.filter((_, i) => i !== index));
-  };
-
-  const handlePromptSave = () => {
-    if (prompts.some(p => !p.trigger.trim() || !p.response.trim())) {
-      toast.error('All prompts require both trigger and response');
-      return;
-    }
-    toast.success('Prompts saved successfully');
-  };
-
-  return (
-    <div className="card bg-base-200 shadow-xl p-6">
-      <h3 className="text-xl font-bold mb-4">Prompt Engineering</h3>
-      
-      <div className="grid gap-4">
-        {prompts.map((prompt, index) => (
-          <div key={index} className="flex gap-2 items-center">
-            <input
-              type="text"
-              placeholder="Trigger"
-              value={prompt.trigger}
-              onChange={(e) => setPrompts(
-                prompts.map((p, i) => 
-                  i === index ? { ...p, trigger: e.target.value } : p
-                )
-              )}
-              className="input input-bordered flex-1"
-            />
-            <input
-              type="text"
-              placeholder="Response"
-              value={prompt.response}
-              onChange={(e) => setPrompts(
-                prompts.map((p, i) => 
-                  i === index ? { ...p, response: e.target.value } : p
-                )
-              )}
-              className="input input-bordered flex-1"
-            />
-            <button 
-              onClick={() => removePrompt(index)}
-              className="btn btn-circle btn-error btn-sm"
-            >
-              ✕
-            </button>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button onClick={addPrompt} className="btn btn-primary">
-          Add Prompt
-        </button>
-        <button onClick={handlePromptSave} className="btn btn-success">
-          Save Prompts
-        </button>
-      </div>
-
-      <div className="mt-6">
-        <h4 className="text-lg font-semibold mb-2">Suggestions</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          {suggestions.map((suggestion, index) => (
-            <div key={index} className="card bg-base-100 p-2 cursor-pointer"
-              onClick={() => setPrompts([...prompts, suggestion])}
-            >
-              <div className="font-medium">{suggestion.trigger}</div>
-              <div className="text-sm opacity-75">{suggestion.response}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default PromptEditor;// components/AnalyticsChart.tsx
-import { useMemo } from 'react';
-import { Line } from 'react-chartjs-2';
-import { Chart, registerables } from 'chart.js';
-import type { AnalyticsData } from '../types/types'; // Assuming AnalyticsData type is defined
-
-Chart.register(...registerables);
-
-interface AnalyticsChartProps {
-  analyticsData: AnalyticsData[]; // Expecting an array of AnalyticsData
-}
-
-function AnalyticsChart({ analyticsData }: AnalyticsChartProps) {
-  const chartData = useMemo(() => {
-    return {
-      labels: analyticsData.map(data => data.date), // Assuming AnalyticsData has a date field
-      datasets: [
-        {
-          label: 'Messages Over Time',
-          data: analyticsData.map(data => data.messages), // Assuming AnalyticsData has a messages field
-          borderColor: 'rgb(75, 192, 192)',
-          tension: 0.1,
-        },
-      ],
-    };
-  }, [analyticsData]);
-
-  const chartOptions = useMemo(() => {
-    return {
-      responsive: true,
-      plugins: {
-        legend: {
-          position: 'top' as const,
-        },
-        title: {
-          display: true,
-          text: 'Messages Trend',
-        },
-      },
-    };
-  }, []);
-
-  return <Line options={chartOptions} data={chartData} />;
-}
-
-export default AnalyticsChart;import { useState } from "react";
-import { ChatSettings, Message } from "~/types/types";
-
-interface ChatPreviewProps {
-  messages: Message[];
-  onSendMessage: (message: string) => void;
-  settings: ChatSettings;
-  isLoading?: boolean;
-}
-
-export const ChatPreview = ({ messages, onSendMessage, settings, isLoading }: ChatPreviewProps) => {
-  const [input, setInput] = useState("");
-
-  const handleSend = () => {
-    if (!input.trim()) return;
-    onSendMessage(input);
-    setInput("");
-  };
-
-  return (
-    <div
-      className="relative border rounded-lg shadow-lg overflow-hidden"
-      style={{
-        width: `${settings.chatWidth}px`,
-        height: `${settings.chatHeight}px`,
-        background: settings.chatBackground,
-        opacity: settings.chatOpacity,
-        borderRadius: `${settings.chatBorderRadius}px`,
-      }}
-    >
-      <div
-        className="p-3 flex items-center"
-        style={{ background: settings.brandColor, color: settings.headingColor }}
-      >
-        {settings.customLogo && (
-          <img src={settings.customLogo} alt="Logo" className="w-8 h-8 mr-2 rounded-full" />
-        )}
-        <h3 className="text-lg font-semibold">Chatbot</h3>
-      </div>
-      <div
-        className="p-4 overflow-y-auto"
-        style={{ height: `${settings.chatHeight - 120}px` }}
-      >
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`mb-2 p-3 rounded-lg ${msg.role === "user" ? "ml-auto" : "mr-auto"}`}
-            style={{
-              background: msg.role === "user" ? settings.userBubbleColor : settings.aiBubbleColor,
-              maxWidth: "80%",
-            }}
-          >
-            <p>{msg.content}</p>
-            <small className="text-xs text-gray-500 block mt-1">
-              {new Date(msg.createdAt).toLocaleTimeString()}
-            </small>
-          </div>
-        ))}
-        {isLoading && (
-          <div className="mb-2 p-3 rounded-lg mr-auto flex items-center" style={{ background: settings.aiBubbleColor }}>
-            <span className="loading loading-spinner mr-2"></span> Thinking...
-          </div>
-        )}
-      </div>
-      <div className="p-4 border-t">
-        <div className="flex gap-2 mb-2 flex-wrap">
-          {settings.quickReplies.map((reply, index) => (
-            <button
-              key={index}
-              className="btn btn-sm btn-outline"
-              onClick={() => onSendMessage(reply.text)}
-              style={{ background: settings.brandColor, color: "#fff" }}
-            >
-              {reply.text}
-            </button>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={(e) => e.key === "Enter" && handleSend()}
-            className="input input-bordered flex-1"
-            placeholder="Type a message..."
-          />
-          <button onClick={handleSend} className="btn btn-primary">Send</button>
-        </div>
-      </div>
-    </div>
-  );
-};// components/Skeleton.tsx
-export default function Skeleton({ lines = 3 }: { lines?: number }) {
-  return (
-    <div className="animate-pulse space-y-4">
-      {Array.from({ length: lines }).map((_, i) => (
-        <div
-          key={i}
-          className="h-4 bg-gray-200 rounded"
-          style={{
-            width: `${Math.random() * 50 + 50}%`, // Width between 50% and 100%
-            backgroundColor: i % 2 === 0 ? 'bg-gray-300' : 'bg-gray-200' // Alternate colors
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-import { useState } from "react";
-import { ChatPreview } from "./chatPreview";
-import { ChatSettings, Message } from "~/types/types";
-
-interface ChatTogglerProps {
-  settings: ChatSettings;
-  messages: Message[];
-  onSendMessage: (message: string) => void;
-  isLoading?: boolean;
-}
-
-export const ChatToggler = ({ settings, messages, onSendMessage, isLoading }: ChatTogglerProps) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <div className="fixed bottom-4 right-4 z-50">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="btn btn-circle btn-primary shadow-lg text-2xl"
-      >
-        {isOpen ? "×" : "💬"}
-      </button>
-      {isOpen && (
-        <div className="mt-2">
-          <ChatPreview
-            settings={settings}
-            messages={messages}
-            onSendMessage={onSendMessage}
-            isLoading={isLoading}
-          />
-        </div>
-      )}
-    </div>
-  );
-};interface TabProps {
-  id: string;
-  label: string;
-  icon: React.ReactNode;
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
-}
-
-const Tab = ({ id, label, icon, activeTab, setActiveTab }: TabProps) => {
-  const isActive = activeTab === id;
-  return (
-    <button
-      onClick={() => setActiveTab(id)}
-      className={`flex items-center space-x-2 px-4 py-2 rounded-lg ${
-        isActive ? "bg-primary text-white" : "text-gray-400 hover:text-white"
-      }`}
-    >
-      {icon}
-      <span>{label}</span>
-    </button>
-  );
-};
-
-export default Tab;
-// app/components/ErrorComponent.tsx
-import { Link, useRouteError } from "@remix-run/react";
-import { motion } from "framer-motion";
-import type { ReactNode } from "react";
-import { Navbar } from "./layout/navbar"; // Import your Navbar component
-
-interface ErrorComponentProps {
-  status?: number;
-  title?: string;
-  message?: string;
-  children?: ReactNode;
-  authenticated?: boolean;
-}
-
-const statusMessages: Record<number, string> = {
-  400: "The request sent to the server was invalid or corrupted",
-  401: "Authentication required to access this resource",
-  403: "You don't have permission to view this content",
-  404: "The page you're looking for doesn't exist",
-  500: "Our servers encountered an unexpected condition",
-  503: "We're performing maintenance - please check back soon",
-};
-
-const defaultTitles: Record<number, string> = {
-  400: "Invalid Request",
-  401: "Authorization Required",
-  403: "Access Restricted",
-  404: "Page Not Found",
-  500: "Server Error", 
-  503: "Service Unavailable",
-};
-
-export default function ErrorComponent({
-  status,
-  title,
-  message,
-  children,
-  authenticated = false,
-}: ErrorComponentProps) {
-  const error = useRouteError();
-  const effectiveStatus = status || (error as any)?.status || 500;
-  
-  // Dynamic content resolution with fallbacks
-  const errorTitle = title || defaultTitles[effectiveStatus] || "Unexpected Error";
-  const errorMessage = message || statusMessages[effectiveStatus] || 
-    "An unexpected error occurred. Our engineering team has been notified.";
-
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-background/95 to-background/90">
-     
-      
-      <motion.main
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="flex items-center justify-center p-8 pt-24" // Added pt-24 for navbar spacing
-      >
-        <div className="glass neo-brutalism p-8 rounded-2xl shadow-xl w-full max-w-2xl">
-          <div className="flex flex-col md:flex-row items-center gap-8">
-            {effectiveStatus && (
-              <div className="text-8xl font-bold bg-gradient-to-r from-error to-secondary bg-clip-text text-transparent">
-                {effectiveStatus}
-              </div>
-            )}
-            
-            <div className="space-y-4 flex-1">
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                {errorTitle}
-              </h1>
-              <p className="text-lg text-gray-300 leading-relaxed">
-                {errorMessage}
-              </p>
-              
-              {children && (
-                <div className="mt-4 p-4 bg-background/50 rounded-lg">
-                  {children}
-                </div>
-              )}
-              
-              <div className="mt-8 flex flex-col sm:flex-row gap-4">
-                <Link
-                  to="/"
-                  className="btn btn-primary gap-2 hover:scale-[0.98] transition-transform"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                  >
-                    <path d="M5 13h8.5l-4 4-1.414-1.414L10.172 13H5v-2h8.5l-4-4 1.414-1.414L15.5 11H19v2h-6.172l2.586 2.586L14 17.5l-5-5 5-5 1.414 1.414L12.828 11H19v2z" />
-                  </svg>
-                  Return to Home
-                </Link>
-                
-                <Link
-                  to="/support"
-                  className="btn btn-outline gap-2 hover:bg-background/20"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                  >
-                    <path d="M3 18h12v-2H3v2zM3 6v2h18V6H3zm0 7h18v-2H3v2z" />
-                  </svg>
-                  Contact Support
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </motion.main>
-    </div>
-  );
-}// app/utils/auth.server.ts
-import { redirect } from "@remix-run/node";
-import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
-import { User } from "~/types/types"; // Assuming User type is defined in types.ts
-
-export async function requireAuth(request: Request): Promise<User> {
-  const { isAuthenticated, getUser } = await getKindeSession(request);
-  if (!(await isAuthenticated())) {
-    throw redirect("/login");
+  try {
+    return await chain.invoke(message); // Pass message as the input
+  } catch (error) {
+    console.error("Error generating response:", error);
+    return "Sorry, I couldn’t process your request.";
   }
-  const user = await getUser();
-  if (!user || !user.email) {
-    throw redirect("/login"); // Ensure user is not null and has an email
-  }
-  return user as unknown as User; // Cast to User type, ensuring non-null
-}async function generateCode(language: string, prompt: string) {
-    // Implement your code generation logic here
-    // This could use an AI model or template-based generation
-    const templates = {
-      javascript: `
-  function ${prompt.toLowerCase().replace(/\s+/g, '')}() {
-    // Generated code for ${prompt}
-    console.log('Implementing ${prompt}');
-  }
-      `,
-      python: `
-  def ${prompt.toLowerCase().replace(/\s+/g, '_')}():
-      # Generated code for ${prompt}
-      print('Implementing ${prompt}')
-      `,
-      react: `
-  import React from 'react';
-  
-  export const ${prompt.replace(/\s+/g, '')} = () => {
-    return (
-      <div>
-        <h1>${prompt}</h1>
-      </div>
-    );
-  };
-      `,
-    };
-  
-    return templates[language as keyof typeof templates] || 'Language not supported';
-  }import { ChatSettings, EmbedCode } from "~/types/types";
+};import { PrismaClient } from "@prisma/client";
+import { env } from "~/config/env";
 
-export function generateEmbedCode(settings: ChatSettings, connectionString: string): EmbedCode {
+declare global {
+  var prisma: PrismaClient | undefined;
+}
+
+export const prisma = global.prisma || new PrismaClient({
+  log: env.NODE_ENV === "development" ? ["query", "info", "warn", "error"] : ["error"],
+});
+
+if (env.NODE_ENV !== "production") global.prisma = prisma;
+
+export default prisma;import { ChatSettings, EmbedCode } from "~/types/types";
+
+export function generateEmbedCode(settings: ChatSettings, connectionString: string, name: string): EmbedCode {
   const {
     brandColor, customLogo, chatWidth, chatHeight, chatBackground,
     chatOpacity, chatBorderRadius, userBubbleColor, aiBubbleColor, headingColor,
@@ -3023,20 +3437,54 @@ export async function getUserMetrics(userId: string) {
 export async function checkRateLimit(userId: string) {
   const { success, remaining } = await rateLimiter.limit(userId);
   return { success, remaining };
-}import { PrismaClient } from "@prisma/client";
-import { env } from "~/config/env";
+}// ~/utils/astra.server.ts
+import { DataAPIClient, Db } from "@datastax/astra-db-ts";
 
-declare global {
-  var prisma: PrismaClient | undefined;
+/**
+ * Connects to a DataStax Astra database.
+ * Expects the environment variables:
+ *   ASTRA_DB_API_ENDPOINT and ASTRA_DB_APPLICATION_TOKEN.
+ */
+export function connectToDatabase(): Db {
+  const { ASTRA_DB_API_ENDPOINT: endpoint, ASTRA_DB_APPLICATION_TOKEN: token } = process.env;
+  if (!token || !endpoint) {
+    throw new Error("ASTRA_DB_API_ENDPOINT and ASTRA_DB_APPLICATION_TOKEN must be defined.");
+  }
+  const client = new DataAPIClient(token);
+  const database = client.db(endpoint);
+  console.log(`Connected to database ${database.id}`);
+  return database;
 }
-
-export const prisma = global.prisma || new PrismaClient({
-  log: env.NODE_ENV === "development" ? ["query", "info", "warn", "error"] : ["error"],
-});
-
-if (env.NODE_ENV !== "production") global.prisma = prisma;
-
-export default prisma;import { Redis } from "@upstash/redis";
+async function generateCode(language: string, prompt: string) {
+    // Implement your code generation logic here
+    // This could use an AI model or template-based generation
+    const templates = {
+      javascript: `
+  function ${prompt.toLowerCase().replace(/\s+/g, '')}() {
+    // Generated code for ${prompt}
+    console.log('Implementing ${prompt}');
+  }
+      `,
+      python: `
+  def ${prompt.toLowerCase().replace(/\s+/g, '_')}():
+      # Generated code for ${prompt}
+      print('Implementing ${prompt}')
+      `,
+      react: `
+  import React from 'react';
+  
+  export const ${prompt.replace(/\s+/g, '')} = () => {
+    return (
+      <div>
+        <h1>${prompt}</h1>
+      </div>
+    );
+  };
+      `,
+    };
+  
+    return templates[language as keyof typeof templates] || 'Language not supported';
+  }import { Redis } from "@upstash/redis";
 import { Ratelimit } from "@upstash/ratelimit";
 import { env } from "~/config/env";
 
@@ -3055,92 +3503,22 @@ export const rateLimiter = new Ratelimit({
 export async function checkRateLimit(userId: string) {
   const { success, remaining } = await rateLimiter.limit(userId);
   return { success, remaining };
-}// app/utils/gemini.server.ts
-import { AstraDBVectorStore } from "@langchain/community/vectorstores/astradb";
-import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { RunnableSequence, RunnableMap } from "@langchain/core/runnables";
-import { StringOutputParser } from "@langchain/core/output_parsers";
-import { PromptTemplate } from "@langchain/core/prompts";
-import { TaskType } from "@google/generative-ai";
-import { env } from "~/config/env";
-import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
+}// app/utils/auth.server.ts
+import { redirect } from "@remix-run/node";
+import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
+import { User } from "~/types/types"; // Assuming User type is defined in types.ts
 
-const embeddings = new GoogleGenerativeAIEmbeddings({
-  apiKey: env.GOOGLE_API_KEY,
-  modelName: "text-embedding-004",
-  taskType: TaskType.RETRIEVAL_DOCUMENT,
-});
-
-const llm = new ChatGoogleGenerativeAI({
-  apiKey: env.GOOGLE_API_KEY,
-  model: "gemini-1.5-pro",
-  temperature: 0.7,
-  maxRetries: 2,
-});
-
-export async function initializeVectorStore() {
-  const splitter = new RecursiveCharacterTextSplitter({ chunkSize: 1000, chunkOverlap: 200 });
-  const docs = [
-    "Chatbots are AI-powered conversational agents that assist users.",
-    "To customize your chatbot, adjust colors, sizes, and quick replies in the settings panel.",
-    "For support, contact us at support@chatbuilder.com.",
-  ];
-  const splitDocs = await splitter.createDocuments(docs);
-  await AstraDBVectorStore.fromDocuments(splitDocs, embeddings, {
-    token: env.ASTRA_DB_APPLICATION_TOKEN,
-    endpoint: env.ASTRA_DB_ENDPOINT,
-    collection: env.ASTRA_DB_COLLECTION,
-  });
-}
-
-export const generateResponse = async (message: string, context: string): Promise<string> => {
-  const vectorStore = await AstraDBVectorStore.fromExistingIndex(embeddings, {
-    token: env.ASTRA_DB_APPLICATION_TOKEN,
-    endpoint: env.ASTRA_DB_ENDPOINT,
-    collection: env.ASTRA_DB_COLLECTION,
-  });
-
-  const retriever = vectorStore.asRetriever();
-  const prompt = PromptTemplate.fromTemplate(
-    "Answer based on the following context:\n{context}\n\nQuestion: {question}"
-  );
-
-  const chain = RunnableSequence.from([
-    RunnableMap.from({
-      context: retriever.pipe((docs) => docs.map((doc) => doc.pageContent).join("\n")),
-      question: (input: string) => input, // Pass message directly
-    }),
-    prompt,
-    llm,
-    new StringOutputParser(),
-  ]);
-
-  try {
-    return await chain.invoke(message); // Pass message as the input
-  } catch (error) {
-    console.error("Error generating response:", error);
-    return "Sorry, I couldn’t process your request.";
+export async function requireAuth(request: Request): Promise<User> {
+  const { isAuthenticated, getUser } = await getKindeSession(request);
+  if (!(await isAuthenticated())) {
+    throw redirect("/login");
   }
-};// ~/utils/astra.server.ts
-import { DataAPIClient, Db } from "@datastax/astra-db-ts";
-
-/**
- * Connects to a DataStax Astra database.
- * Expects the environment variables:
- *   ASTRA_DB_API_ENDPOINT and ASTRA_DB_APPLICATION_TOKEN.
- */
-export function connectToDatabase(): Db {
-  const { ASTRA_DB_API_ENDPOINT: endpoint, ASTRA_DB_APPLICATION_TOKEN: token } = process.env;
-  if (!token || !endpoint) {
-    throw new Error("ASTRA_DB_API_ENDPOINT and ASTRA_DB_APPLICATION_TOKEN must be defined.");
+  const user = await getUser();
+  if (!user || !user.email) {
+    throw redirect("/login"); // Ensure user is not null and has an email
   }
-  const client = new DataAPIClient(token);
-  const database = client.db(endpoint);
-  console.log(`Connected to database ${database.id}`);
-  return database;
-}
-type LogLevel = "info" | "error" | "warn";
+  return user as unknown as User; // Cast to User type, ensuring non-null
+}type LogLevel = "info" | "error" | "warn";
 
 interface LogEntry {
   timestamp: string;
@@ -3171,4 +3549,133 @@ export class Logger {
   static warn(message: string, data?: Record<string, any>) {
     this.log("warn", message, data);
   }
+}// app/root.tsx
+import { Links, Meta, Outlet, Scripts, ScrollRestoration, useRouteError, isRouteErrorResponse } from "@remix-run/react";
+import type { LinksFunction } from "@remix-run/node";
+import "./tailwind.css";
+import NotFound from "./routes/_404";
+import { StrictMode } from "react";
+import { Navbar } from "~/components/layout/navbar";
+import ErrorComponent from "./components/error";
+
+export const links: LinksFunction = () => [
+  { rel: "preconnect", href: "https://fonts.googleapis.com" },
+  { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+  {
+    rel: "stylesheet",
+    href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
+  },
+];
+
+export function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <Meta />
+        <Links />
+      </head>
+      <body>
+       
+        {children}
+        <ScrollRestoration />
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+
+export function ErrorBoundary() {
+  const error = useRouteError();
+  if (isRouteErrorResponse(error)) return <NotFound />;
+  let errorMessage = "Unknown error";
+  if (error instanceof Error) errorMessage = error.message;
+  return <ErrorComponent message={errorMessage} />;
+}
+
+export default function App() {
+  return (
+    <StrictMode>
+      <Layout>
+        <Outlet />
+      </Layout>
+    </StrictMode>
+  );
+}
+
+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  kindeId   String    @unique
+  email     String    @unique
+  name      String?
+  createdAt DateTime  @default(now())
+  chatbots  Chatbot[]
+}
+
+model Chatbot {
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  name            String
+  connectionString String       @unique
+  userId          String
+  user            User          @relation(fields: [userId], references: [kindeId])
+  settings        ChatSettings?
+  conversations   Conversation[]
+  createdAt       DateTime      @default(now())
+
+  Prompt Prompt[]
+}
+model Prompt {
+  id         String   @id @default(uuid()) @map("_id")
+  chatbotId  String
+  chatbot    Chatbot  @relation(fields: [chatbotId], references: [id])
+  trigger    String
+  response   String
+  createdAt  DateTime @default(now())
+}
+model ChatSettings {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  chatbotId        String   @unique @db.ObjectId
+  chatbot          Chatbot  @relation(fields: [chatbotId], references: [id])
+  brandColor       String
+  chatBackground   String
+  chatOpacity      Float
+  chatBorderRadius Int
+  customLogo       String?
+  chatWidth        Int      @default(300)
+  chatHeight       Int      @default(400)
+  showEmailCapture Boolean  @default(false)
+  emailPlaceholder String   @default("Enter your email")
+  quickReplies     Json
+  userBubbleColor String @default("#e0e0e0")
+  aiBubbleColor   String @default("#2563eb")
+  headingColor    String @default("#000000")
+}
+
+model Conversation {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  chatbotId String    @db.ObjectId
+  createdAt  DateTime @default(now())
+  chatbot   Chatbot   @relation(fields: [chatbotId], references: [id])
+  messages  Message[]
+}
+
+model Message {
+  id            String      @id @default(auto()) @map("_id") @db.ObjectId
+  conversationId String     @db.ObjectId
+  conversation  Conversation @relation(fields: [conversationId], references: [id])
+  content       String
+  role          String
+  createdAt     DateTime    @default(now())
 }

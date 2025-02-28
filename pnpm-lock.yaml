@@ -51,11 +51,11 @@ importers:
         specifier: ^15.1.7
         version: 15.1.7(@mdx-js/react@3.1.0(@types/react@18.3.18)(react@18.3.1))
       '@prisma/client':
-        specifier: 6.3.1
-        version: 6.3.1(prisma@6.3.1(typescript@5.7.3))(typescript@5.7.3)
+        specifier: 6.4.1
+        version: 6.4.1(prisma@6.3.1(typescript@5.7.3))(typescript@5.7.3)
       '@prisma/extension-accelerate':
         specifier: ^1.2.1
-        version: 1.2.1(@prisma/client@6.3.1(prisma@6.3.1(typescript@5.7.3))(typescript@5.7.3))
+        version: 1.2.1(@prisma/client@6.4.1(prisma@6.3.1(typescript@5.7.3))(typescript@5.7.3))
       '@remix-run/node':
         specifier: ^2.15.3
         version: 2.15.3(typescript@5.7.3)
@@ -1404,8 +1404,8 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
-  '@prisma/client@6.3.1':
-    resolution: {integrity: sha512-ARAJaPs+eBkemdky/XU3cvGRl+mIPHCN2lCXsl5Vlb0E2gV+R6IN7aCI8CisRGszEZondwIsW9Iz8EJkTdykyA==}
+  '@prisma/client@6.4.1':
+    resolution: {integrity: sha512-A7Mwx44+GVZVexT5e2GF/WcKkEkNNKbgr059xpr5mn+oUm2ZW1svhe+0TRNBwCdzhfIZ+q23jEgsNPvKD9u+6g==}
     engines: {node: '>=18.18'}
     peerDependencies:
       prisma: '*'
@@ -6457,7 +6457,7 @@ snapshots:
     dependencies:
       playwright: 1.50.1
 
-  '@prisma/client@6.3.1(prisma@6.3.1(typescript@5.7.3))(typescript@5.7.3)':
+  '@prisma/client@6.4.1(prisma@6.3.1(typescript@5.7.3))(typescript@5.7.3)':
     optionalDependencies:
       prisma: 6.3.1(typescript@5.7.3)
       typescript: 5.7.3
@@ -6473,9 +6473,9 @@ snapshots:
       '@prisma/fetch-engine': 6.3.1
       '@prisma/get-platform': 6.3.1
 
-  '@prisma/extension-accelerate@1.2.1(@prisma/client@6.3.1(prisma@6.3.1(typescript@5.7.3))(typescript@5.7.3))':
+  '@prisma/extension-accelerate@1.2.1(@prisma/client@6.4.1(prisma@6.3.1(typescript@5.7.3))(typescript@5.7.3))':
     dependencies:
-      '@prisma/client': 6.3.1(prisma@6.3.1(typescript@5.7.3))(typescript@5.7.3)
+      '@prisma/client': 6.4.1(prisma@6.3.1(typescript@5.7.3))(typescript@5.7.3)
 
   '@prisma/fetch-engine@6.3.1':
     dependencies:
@@ -8661,7 +8661,7 @@ snapshots:
       isstream: 0.1.2
       jsonwebtoken: 9.0.2
       mime-types: 2.1.35
-      retry-axios: 2.6.0(axios@1.7.9)
+      retry-axios: 2.6.0(axios@1.7.9(debug@4.4.0))
       tough-cookie: 4.1.4
     transitivePeerDependencies:
       - supports-color
@@ -10579,7 +10579,7 @@ snapshots:
       onetime: 5.1.2
       signal-exit: 3.0.7
 
-  retry-axios@2.6.0(axios@1.7.9):
+  retry-axios@2.6.0(axios@1.7.9(debug@4.4.0)):
     dependencies:
       axios: 1.7.9(debug@4.4.0)
 

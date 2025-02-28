@@ -115,8 +115,19 @@ export const action: ActionFunction = async ({ request, params }) => {
     await prisma.$transaction(async (tx) => {
       await tx.chatSettings.upsert({
         where: { chatbotId: params.id },
-        create: { chatbotId: params.id!, ...settingsData },
-        update: settingsData,
+        create: {
+          
+          ...settingsData,
+          chatbot: {
+            connect: { id: params.id }, // Connect to the existing Chatbot with this ID
+          },
+        },
+        update: {
+          ...settingsData,
+          chatbot: {
+            connect: { id: params.id }, // Connect to the existing Chatbot with this ID
+          },
+        },
       });
 
       await tx.chatbot.update({
@@ -134,15 +145,17 @@ export const action: ActionFunction = async ({ request, params }) => {
     if (!file) return json({ error: "No file uploaded" }, { status: 400 });
 
     const buffer = Buffer.from(await file.arrayBuffer());
+
+    // Dynamically import pdf-parse to avoid SSR issues
     const pdfParse = (await import("pdf-parse")).default;
     const pdfData = await pdfParse(buffer);
     const text = pdfData.text;
-    
+
     const splitter = new RecursiveCharacterTextSplitter({ chunkSize: 1000, chunkOverlap: 200 });
     const docs = await splitter.createDocuments([text]);
 
     const embeddings = new GoogleGenerativeAIEmbeddings({
-      apiKey: env.GOOGLE_API_KEY,
+      apiKey: env.GOOGLE_API_KEY, // Note: You mentioned `GOOGLE_API_KEY` here, but your env.ts uses `GEMINI_API_KEY`. Ensure consistency.
       modelName: "text-embedding-004",
       taskType: TaskType.RETRIEVAL_DOCUMENT,
     });
