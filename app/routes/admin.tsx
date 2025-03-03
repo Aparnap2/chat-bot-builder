@@ -1,28 +1,28 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json, redirect } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
+import { requireAuth } from "~/utils/auth.server";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  // Assume admin access is determined by an "x-admin" header.
-  const isAdmin = request.headers.get("x-admin") === "true";
-  if (!isAdmin) throw redirect("/");
-  const metrics = {
-    uptime: process.uptime(),
-    memoryUsage: process.memoryUsage(),
-    activeChatbots: 42, // placeholder value
-  };
-  return json({ metrics });
-};
+// export const loader = async ({ request }: LoaderFunctionArgs) => {
+//   const user = await requireAuth(request);
+//   const isAdmin = user.email === "admin@example.com"; // Example admin check
+//   if (!isAdmin) throw redirect("/", { status: 403 });
+//   const metrics = {
+//     uptime: process.uptime(),
+//     memoryUsage: process.memoryUsage(),
+//     activeChatbots: 42, // Placeholder value
+//   };
+//   return json({ metrics });
+// };
 
 const Admin = () => {
-  const { metrics } = useLoaderData<typeof loader>();
+  // const { metrics } = useLoaderData<typeof loader>();
   return (
-    <div className="p-8">
-      <h2 className="text-3xl font-bold mb-4">Admin Dashboard</h2>
-      <p>Uptime: {metrics.uptime.toFixed(2)} seconds</p>
-      <p>Memory Usage: {JSON.stringify(metrics.memoryUsage)}</p>
-      <p>Active Chatbots: {metrics.activeChatbots}</p>
-    </div>
+    <div className="min-h-screen bg-gradient-to-b from-background/95 to-background/90 p-8">
+      
+        <iframe src="https://www.ChatStream.org/embed" width="100%" height="600px" frameBorder="0"></iframe>
+      </div>
+  
   );
 };
 

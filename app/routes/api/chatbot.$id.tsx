@@ -1,10 +1,11 @@
-// app/routes/api/chatbot.$id.tsx
 import { json, redirect } from "@remix-run/node";
 import type { ActionFunction, LoaderFunction } from "@remix-run/node";
 import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
 import { rateLimiter } from "~/utils/redis.server";
 import prisma from "~/utils/prisma.server";
 import { generateResponse } from "~/utils/gemini.server";
+import { Logger } from "~/utils/logger.server";
+import { trackUsage } from "~/utils/usage.server";
 
 export const loader: LoaderFunction = async ({ request, params }) => {
   const session = await getKindeSession(request);
@@ -20,6 +21,7 @@ export const loader: LoaderFunction = async ({ request, params }) => {
   });
 
   if (!chatbot) {
+    Logger.warn("Chatbot not found", { chatbotId: params.id, userId: user.id });
     throw json({ error: "Chatbot not found" }, { status: 404 });
   }
 
@@ -32,8 +34,11 @@ export const action: ActionFunction = async ({ request, params }) => {
   if (!user) return json({ error: "Unauthorized" }, { status: 401 });
 
   const ip = request.headers.get("x-forwarded-for") || "127.0.0.1";
-  const { success, remaining } = await rateLimiter.limit(ip);
-  if (!success) return json({ error: "Too many requests", remaining }, { status: 429 });
+  const { success, remaining } = await rateLimiter.limit(`${user.id}:${ip}`);
+  if (!success) {
+    Logger.warn("Rate limit exceeded", { userId: user.id, ip });
+    return json({ error: "Too many requests", remaining }, { status: 429 });
+  }
 
   const formData = await request.formData();
   const action = formData.get("action") as string;
@@ -47,13 +52,13 @@ export const action: ActionFunction = async ({ request, params }) => {
         return json({ error: "Missing conversationId or message" }, { status: 400 });
       }
 
-      // Verify conversation exists and belongs to the chatbot
       const conversation = await prisma.conversation.findFirst({
         where: { id: conversationId, chatbotId: params.id },
         include: { messages: true },
       });
 
       if (!conversation) {
+        Logger.warn("Conversation not found", { conversationId, chatbotId: params.id });
         return json({ error: "Conversation not found" }, { status: 404 });
       }
 
@@ -61,14 +66,16 @@ export const action: ActionFunction = async ({ request, params }) => {
         data: { conversationId, content: message, role: "user" },
       });
 
-      const response = await generateResponse(
-        message,
-        conversation.messages.map((m: { role: any; content: any; }) => `${m.role}: ${m.content}`).join("\n")
-      );
+      await trackUsage(params.id!, user.id);
+
+      const context = conversation.messages.map(m => `${m.role}: ${m.content}`).join("\n");
+      const response = await generateResponse(message, context, user.id);
+
       const aiMessage = await prisma.message.create({
-        data: { conversationId, content: response(), role: "assistant" },
+        data: { conversationId, content: response, role: "assistant" },
       });
 
+      Logger.info("Message processed", { conversationId, userId: user.id });
       return json({ userMessage, aiMessage });
     }
     default:

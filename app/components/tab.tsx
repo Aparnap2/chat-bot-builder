@@ -11,8 +11,8 @@ const Tab = ({ id, label, icon, activeTab, setActiveTab }: TabProps) => {
   return (
     <button
       onClick={() => setActiveTab(id)}
-      className={`flex items-center space-x-2 px-4 py-2 rounded-lg ${
-        isActive ? "bg-primary text-white" : "text-gray-400 hover:text-white"
+      className={`flex items-center space-x-2 px-4 py-2 rounded-lg neo-brutalism ${
+        isActive ? "bg-primary text-white shadow-[3px_3px_0_0_#000]" : "text-gray-400 hover:text-white hover:shadow-[3px_3px_0_0_#000]"
       }`}
     >
       {icon}

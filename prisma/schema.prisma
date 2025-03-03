@@ -14,6 +14,8 @@ model User {
   name      String?
   createdAt DateTime  @default(now())
   chatbots  Chatbot[]
+
+  ApiKey ApiKey[]
 }
 
 model Chatbot {
@@ -27,10 +29,12 @@ model Chatbot {
   createdAt       DateTime      @default(now())
 
   Prompt Prompt[]
+
+  Intent Intent[]
 }
 model Prompt {
   id         String   @id @default(uuid()) @map("_id")
-  chatbotId  String
+  chatbotId  String @db.ObjectId
   chatbot    Chatbot  @relation(fields: [chatbotId], references: [id])
   trigger    String
   response   String
@@ -47,6 +51,8 @@ model ChatSettings {
   customLogo       String?
   chatWidth        Int      @default(300)
   chatHeight       Int      @default(400)
+  chatOffsetX      Int       @default(20)  
+  chatOffsetY      Int       @default(20)  
   showEmailCapture Boolean  @default(false)
   emailPlaceholder String   @default("Enter your email")
   quickReplies     Json
@@ -70,4 +76,17 @@ model Message {
   content       String
   role          String
   createdAt     DateTime    @default(now())
+}
+model Intent {
+  id        String   @id @default(uuid()) @map("_id")
+  name      String
+  responses String[] // Array of response strings
+  chatbotId String @db.ObjectId
+  chatbot   Chatbot  @relation(fields: [chatbotId], references: [id])
+}
+model ApiKey {
+  id     String @id @default(uuid()) @map("_id")
+  key    String @unique
+  userId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id])
 }

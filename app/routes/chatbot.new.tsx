@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { Form, useNavigation, redirect, useActionData } from "@remix-run/react";
-import { LoaderFunctionArgs, json, ActionFunction } from "@remix-run/node";
+import { Form, useNavigation, useActionData } from "@remix-run/react";
+import { LoaderFunctionArgs, json, ActionFunction, redirect } from "@remix-run/node";
 import { getKindeSession } from "@kinde-oss/kinde-remix-sdk";
 import prisma from "~/utils/prisma.server";
 import { v4 as uuidv4 } from "uuid";
 import { ChatPreview } from "~/components/chatPreview";
-
 import { Logger } from "~/utils/logger.server";
 import { ChatSettings } from "~/types/types";
+import { Navbar } from "~/components/layout/navbar";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { isAuthenticated, getUser } = await getKindeSession(request);
@@ -28,7 +28,10 @@ export const action: ActionFunction = async ({ request }) => {
   const quickRepliesRaw = formData.get("quickReplies") as string;
   const quickReplies = quickRepliesRaw ? JSON.parse(quickRepliesRaw) : [];
 
-  if (!name) return json({ error: "Name is required" }, { status: 400 });
+  // Enhanced validation
+  if (!name || name.length < 3) {
+    return json({ error: "Name must be at least 3 characters" }, { status: 400 });
+  }
 
   try {
     const chatbot = await prisma.chatbot.create({
@@ -56,18 +59,12 @@ export const action: ActionFunction = async ({ request }) => {
         conversations: {
           create: [{ messages: { create: [{ content: initialMessage, role: "system" }] } }],
         },
+        Prompt: { create: [] }, // Initialize empty prompts array
       },
     });
 
-    await prisma.$transaction(async (tx) => {
-      await tx.chatSettings.update({
-        where: { chatbotId: chatbot.id },
-        data: { chatbotId: chatbot.id },
-      });
-    });
-
     Logger.info("Chatbot created", { chatbotId: chatbot.id });
-    return redirect("/dashboard");
+    return redirect(`/chatbot/${chatbot.id}`);
   } catch (error) {
     Logger.error("Error creating chatbot", { error });
     return json({ error: "Failed to create chatbot" }, { status: 500 });
@@ -87,6 +84,11 @@ export default function NewChatbot() {
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Basic file validation
+      if (!file.type.startsWith("image/") || file.size > 2 * 1024 * 1024) { // 2MB limit
+        alert("Please upload an image file under 2MB.");
+        return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => setLogoPreview(reader.result as string);
       reader.readAsDataURL(file);
@@ -95,7 +97,7 @@ export default function NewChatbot() {
 
   const addQuickReply = () => setQuickReplies([...quickReplies, { text: "", action: "" }]);
   const removeQuickReply = (index: number) => setQuickReplies(quickReplies.filter((_, i) => i !== index));
-  const handleQuickReplyChange = (index: number, field: keyof { text: string; action: string }, value: string) => {
+  const handleQuickReplyChange = (index: number, field: "text" | "action", value: string) => {
     const newReplies = [...quickReplies];
     newReplies[index][field] = value;
     setQuickReplies(newReplies);
@@ -116,81 +118,83 @@ export default function NewChatbot() {
     userBubbleColor: "#e0e0e0",
     aiBubbleColor: "#2563eb",
     headingColor: "#000000",
+    chatTitle: name || "Chatbot",
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      
+    <div className="min-h-screen bg-gradient-to-b from-background/95 to-background/90">
+      <Navbar />
       <div className="max-w-5xl mx-auto p-8">
-        <h1 className="text-3xl font-bold mb-6">Create New Chatbot</h1>
+        <h1 className="text-3xl font-bold mb-6 text-white">Create New Chatbot</h1>
         {actionData?.error && <div className="alert alert-error mb-4">{actionData.error}</div>}
         <Form method="post" className="space-y-6" encType="multipart/form-data">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-gray-800 p-6 rounded-lg shadow">
-              <h2 className="text-xl font-semibold mb-4">Basic Information</h2>
+            <div className="glass-card p-6 rounded-xl shadow-xl">
+              <h2 className="text-xl font-semibold mb-4 text-white">Basic Information</h2>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm">Chatbot Name</label>
+                  <label className="block text-sm font-medium text-gray-400">Chatbot Name</label>
                   <input
                     type="text"
                     name="name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="input input-bordered w-full"
+                    className="input input-bordered w-full bg-gray-800 text-white"
                     required
+                    minLength={3} // Client-side validation
                   />
                 </div>
                 <div>
-                  <label className="block text-sm">Brand Color</label>
+                  <label className="block text-sm font-medium text-gray-400">Brand Color</label>
                   <input
                     type="color"
                     name="brandColor"
                     value={brandColor}
                     onChange={(e) => setBrandColor(e.target.value)}
-                    className="w-20 h-12"
+                    className="w-20 h-12 rounded-lg border border-gray-600"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm">Logo</label>
+                  <label className="block text-sm font-medium text-gray-400">Logo</label>
                   <input
                     type="file"
                     accept="image/*"
                     onChange={handleLogoChange}
-                    className="file-input file-input-bordered w-full"
+                    className="file-input file-input-bordered w-full bg-gray-800 text-white file:bg-primary file:text-white file:border-0 file:rounded-full"
                   />
-                  {logoPreview && <img src={logoPreview} alt="Preview" className="mt-2 w-16 h-16 rounded" />}
+                  {logoPreview && <img src={logoPreview} alt="Preview" className="mt-2 w-16 h-16 rounded-lg" />}
                   <input type="hidden" name="customLogo" value={logoPreview || ""} />
                 </div>
               </div>
             </div>
-            <div className="bg-gray-800 p-6 rounded-lg shadow">
-              <h2 className="text-xl font-semibold mb-4">Initial Setup</h2>
+            <div className="glass-card p-6 rounded-xl shadow-xl">
+              <h2 className="text-xl font-semibold mb-4 text-white">Initial Setup</h2>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm">Welcome Message</label>
+                  <label className="block text-sm font-medium text-gray-400">Welcome Message</label>
                   <textarea
                     name="initialMessage"
                     value={initialMessage}
                     onChange={(e) => setInitialMessage(e.target.value)}
-                    className="textarea textarea-bordered w-full h-24"
+                    className="textarea textarea-bordered w-full h-24 bg-gray-800 text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm">Quick Replies</label>
+                  <label className="block text-sm font-medium text-gray-400">Quick Replies</label>
                   {quickReplies.map((reply, index) => (
                     <div key={index} className="flex gap-2 mb-2">
                       <input
                         type="text"
                         value={reply.text}
                         onChange={(e) => handleQuickReplyChange(index, "text", e.target.value)}
-                        className="input input-bordered flex-1"
+                        className="input input-bordered flex-1 bg-gray-800 text-white"
                         placeholder="Text"
                       />
                       <input
                         type="text"
                         value={reply.action}
                         onChange={(e) => handleQuickReplyChange(index, "action", e.target.value)}
-                        className="input input-bordered w-1/3"
+                        className="input input-bordered w-1/3 bg-gray-800 text-white"
                         placeholder="Action"
                       />
                       <button
@@ -210,8 +214,8 @@ export default function NewChatbot() {
               </div>
             </div>
           </div>
-          <div className="bg-gray-800 p-6 rounded-lg shadow">
-            <h2 className="text-xl font-semibold mb-4">Preview</h2>
+          <div className="glass-card p-6 rounded-xl shadow-xl">
+            <h2 className="text-xl font-semibold mb-4 text-white">Preview</h2>
             <ChatPreview
               messages={[{ id: "preview", content: initialMessage, role: "system", createdAt: new Date() }]}
               onSendMessage={() => {}}
@@ -219,7 +223,7 @@ export default function NewChatbot() {
             />
           </div>
           <div className="flex justify-end">
-            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+            <button type="submit" className="neo-brutalism btn btn-primary" disabled={isSubmitting}>
               {isSubmitting ? "Creating..." : "Create Chatbot"}
             </button>
           </div>

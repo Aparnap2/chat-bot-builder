@@ -9,7 +9,7 @@ export const redis = new Redis({
 
 export const rateLimiter = new Ratelimit({
   redis,
-  limiter: Ratelimit.fixedWindow(10, "10000000 d"), // 10 responses per lifetime
+  limiter: Ratelimit.fixedWindow(10, "10000000d"), // 10 responses per lifetime
   analytics: true,
   prefix: "chatbot:ratelimit",
 });

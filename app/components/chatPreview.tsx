@@ -1,92 +1,228 @@
-import { useState } from "react";
-import { ChatSettings, Message } from "~/types/types";
+"use client"
 
-interface ChatPreviewProps {
-  messages: Message[];
-  onSendMessage: (message: string) => void;
-  settings: ChatSettings;
-  isLoading?: boolean;
+import { useState, useCallback, useEffect, useRef } from "react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { ChatSettings, QuickReply } from "@/types/types"
+import { Send, X, MessageSquare } from 'lucide-react'
+
+interface ChatbotPreviewProps {
+  settings: ChatSettings
 }
 
-export const ChatPreview = ({ messages, onSendMessage, settings, isLoading }: ChatPreviewProps) => {
-  const [input, setInput] = useState("");
+type Message = {
+  role: 'user' | 'assistant'
+  content: string
+}
 
-  const handleSend = () => {
-    if (!input.trim()) return;
-    onSendMessage(input);
-    setInput("");
-  };
+export function ChatbotPreview({ settings }: ChatbotPreviewProps) {
+  const [isOpen, setIsOpen] = useState(true)
+  const [messages, setMessages] = useState<Message[]>([
+    { 
+      role: 'assistant', 
+      content: `Hi there! I'm ${settings.chatbotName}. How can I help you today?` 
+    }
+  ])
+  const [input, setInput] = useState('')
+  const [email, setEmail] = useState('')
+  const [emailSubmitted, setEmailSubmitted] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [])
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages, scrollToBottom])
+
+  const handleSend = useCallback(() => {
+    if (!input.trim()) return
+    
+    setMessages(prev => [...prev, { role: 'user', content: input }])
+    
+    setTimeout(() => {
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: `Thanks for your message! This is a preview of how your chatbot will respond.` 
+      }])
+    }, 1000)
+    
+    setInput('')
+  }, [input])
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSend()
+    }
+  }, [handleSend])
+
+  const handleEmailSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault()
+    if (email) setEmailSubmitted(true)
+  }, [email])
+
+  const handleQuickReply = useCallback((reply: QuickReply) => {
+    setMessages(prev => [...prev, { role: 'user', content: reply.text }])
+    
+    setTimeout(() => {
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: `You selected: ${reply.text}. This is a preview response.` 
+      }])
+    }, 1000)
+  }, [])
+
+  if (!isOpen) {
+    return (
+      <Button 
+        onClick={() => setIsOpen(true)}
+        style={{ backgroundColor: settings.brandColor }}
+        className="fixed bottom-4 right-4 rounded-full w-14 h-14 flex items-center justify-center shadow-lg hover:opacity-90 transition-opacity"
+      >
+        <MessageSquare className="h-6 w-6" />
+      </Button>
+    )
+  }
 
   return (
-    <div
-      className="relative border rounded-lg shadow-lg overflow-hidden"
+    <div 
       style={{
+        maxWidth: '100%',
         width: `${settings.chatWidth}px`,
         height: `${settings.chatHeight}px`,
-        background: settings.chatBackground,
-        opacity: settings.chatOpacity,
+        maxHeight: '90vh',
+        backgroundColor: settings.chatBackground,
         borderRadius: `${settings.chatBorderRadius}px`,
+        opacity: settings.chatOpacity,
       }}
+      className="flex flex-col border border-gray-200 shadow-xl overflow-hidden w-full h-full"
     >
-      <div
-        className="p-3 flex items-center"
-        style={{ background: settings.brandColor, color: settings.headingColor }}
+      {/* Header */}
+      <header 
+        style={{ backgroundColor: settings.brandColor }}
+        className="flex items-center justify-between p-4 text-white"
       >
-        {settings.customLogo && (
-          <img src={settings.customLogo} alt="Logo" className="w-8 h-8 mr-2 rounded-full" />
-        )}
-        <h3 className="text-lg font-semibold">Chatbot</h3>
-      </div>
-      <div
-        className="p-4 overflow-y-auto"
-        style={{ height: `${settings.chatHeight - 120}px` }}
-      >
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`mb-2 p-3 rounded-lg ${msg.role === "user" ? "ml-auto" : "mr-auto"}`}
-            style={{
-              background: msg.role === "user" ? settings.userBubbleColor : settings.aiBubbleColor,
-              maxWidth: "80%",
-            }}
+        <div className="flex items-center gap-2">
+          {settings.customLogo && (
+            <img 
+              src={settings.customLogo} 
+              alt="Chatbot logo" 
+              className="w-8 h-8 rounded object-contain"
+              onError={(e) => (e.currentTarget.style.display = 'none')}
+            />
+          )}
+          <h2 style={{ color: settings.headingColor }} className="font-medium truncate">
+            {settings.chatbotName}
+          </h2>
+        </div>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={() => setIsOpen(false)}
+          className="text-white hover:bg-white/10"
+          aria-label="Close chat"
+        >
+          <X className="h-5 w-5" />
+        </Button>
+      </header>
+      
+      {/* Messages */}
+      <main className="flex-1 p-4 overflow-y-auto space-y-4">
+        {messages.map((message, index) => (
+          <div 
+            key={`message-${index}`}
+            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
-            <p>{msg.content}</p>
-            <small className="text-xs text-gray-500 block mt-1">
-              {new Date(msg.createdAt).toLocaleTimeString()}
-            </small>
+            <div 
+              style={{ 
+                backgroundColor: message.role === 'user' 
+                  ? settings.userBubbleColor 
+                  : settings.aiBubbleColor,
+                color: message.role === 'user' ? '#000000' : '#ffffff'
+              }}
+              className={`rounded-lg px-4 py-2 max-w-[80%] break-words ${
+                message.role === 'user' ? 'rounded-tr-none' : 'rounded-tl-none'
+              }`}
+            >
+              {message.content}
+            </div>
           </div>
         ))}
-        {isLoading && (
-          <div className="mb-2 p-3 rounded-lg mr-auto flex items-center" style={{ background: settings.aiBubbleColor }}>
-            <span className="loading loading-spinner mr-2"></span> Thinking...
-          </div>
-        )}
-      </div>
-      <div className="p-4 border-t">
-        <div className="flex gap-2 mb-2 flex-wrap">
-          {settings.quickReplies.map((reply, index) => (
-            <button
-              key={index}
-              className="btn btn-sm btn-outline"
-              onClick={() => onSendMessage(reply.text)}
-              style={{ background: settings.brandColor, color: "#fff" }}
+        <div ref={messagesEndRef} />
+      </main>
+      
+      {/* Quick Replies */}
+      {settings.quickReplies.length > 0 && (
+        <section className="px-4 py-2 flex flex-wrap gap-2 border-t border-gray-200">
+          {settings.quickReplies.map((reply) => (
+            <Button 
+              key={reply.action}
+              variant="outline"
+              size="sm"
+              onClick={() => handleQuickReply(reply)}
+              className="text-sm truncate"
+              aria-label={`Quick reply: ${reply.text}`}
             >
               {reply.text}
-            </button>
+            </Button>
           ))}
+        </section>
+      )}
+      
+      {/* Email Capture */}
+      {settings.showEmailCapture && !emailSubmitted && (
+        <form 
+          onSubmit={handleEmailSubmit}
+          className="px-4 py-2 border-t border-gray-200"
+        >
+          <div className="flex gap-2">
+            <Input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Enter your email"
+              type="email"
+              required
+              aria-label="Enter your email address"
+              className="flex-1"
+            />
+            <Button 
+              type="submit"
+              style={{ backgroundColor: settings.brandColor }}
+              className="text-white hover:opacity-90"
+              aria-label="Submit email"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
+        </form>
+      )}
+      
+      {/* Input Area */}
+      {!settings.showEmailCapture && (
+        <div className="px-4 py-2 border-t border-gray-200">
+          <div className="flex gap-2">
+            <Input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Type your message..."
+              onKeyDown={handleKeyDown}
+              aria-label="Type your message"
+              className="flex-1"
+            />
+            <Button 
+              onClick={handleSend}
+              style={{ backgroundColor: settings.brandColor }}
+              className="text-white hover:opacity-90"
+              aria-label="Send message"
+              disabled={!input.trim()}
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={(e) => e.key === "Enter" && handleSend()}
-            className="input input-bordered flex-1"
-            placeholder="Type a message..."
-          />
-          <button onClick={handleSend} className="btn btn-primary">Send</button>
-        </div>
-      </div>
+      )}
     </div>
-  );
-};
+  )
+}

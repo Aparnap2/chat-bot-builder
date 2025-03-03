@@ -25,6 +25,7 @@ export const Chatbot = () => (
     aiBubbleColor="${aiBubbleColor}"
     headingColor="${headingColor}"
     quickReplies={${JSON.stringify(quickReplies)}}
+    name="${name}"
   />
 );
 `.trim();
@@ -45,11 +46,12 @@ export const Chatbot = () => (
     userBubbleColor: "${userBubbleColor}",
     aiBubbleColor: "${aiBubbleColor}",
     headingColor: "${headingColor}",
-    quickReplies: ${JSON.stringify(quickReplies)}
+    quickReplies: ${JSON.stringify(quickReplies)},
+    name: "${name}"
   });
   chatbot.init("chatbot-container");
 </script>
 `.trim();
 
-  return { react: reactCode, vanillaJs: reactCode };
+  return { react: reactCode, vanillaJs: vanillaJsCode };
 }
